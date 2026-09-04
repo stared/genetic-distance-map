@@ -18,7 +18,7 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
   el.innerHTML = ''
   const box = document.createElement('div'); box.className = 'tlist'
   const svg = svgEl('svg', { class: 'links' }); box.appendChild(svg); el.appendChild(box)
-  const circle = (sign: string, title: string) => `<span class="tg" title="${esc(title)}">${sign}</span>`
+  const circle = (sign: string, title: string) => `<span class="tg ${sign === '+' ? 'plus' : 'minus'}" title="${esc(title)}"></span>`
   const mkRow = (cls: string, html: string, left: number) => { const e = document.createElement('div'); e.className = 'trow ' + cls; e.style.paddingLeft = left + 'px'; e.innerHTML = html; box.appendChild(e); return e }
   const sel = o.focus, atRoot = sel === t.root
   let selRow: HTMLElement | null = null, upRow: HTMLElement | null = null
@@ -71,7 +71,7 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
       if (n !== sel && n !== t.root) {   // merge handle at the junction (none on the world root)
         const g = svgEl('g', { class: 'junction', transform: `translate(${p.x},${p.y})` })
         g.appendChild(svgEl('circle', { r: R }))
-        const tx = svgEl('text', { y: 1 }); tx.textContent = '−'; g.appendChild(tx)
+        g.appendChild(svgEl('line', { x1: -4, y1: 0, x2: 4, y2: 0 }))
         const tip = svgEl('title', {}); tip.textContent = 'Merge into one cluster: ' + o.name(n); g.appendChild(tip)
         g.addEventListener('click', () => o.onMerge(n)); svg.appendChild(g)
       }
