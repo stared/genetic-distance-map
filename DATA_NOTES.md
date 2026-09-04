@@ -123,3 +123,18 @@ Half of the ancient "averages" are single individuals. Any weighting scheme has 
 - Individual coordinates are unavailable, so within-group variance cannot be recovered; only n is known.
 - Coverage is very uneven: Europe and the Near East dominate; the Americas, Oceania, and inner Africa are thin, especially for moderns.
 - Labels are a curator's judgement, not a taxonomy; profiles and outlier tags may change between yearly editions.
+
+## Era of ancient samples
+
+Ancient labels carry period codes but no dates, so `analysis/era.py` assigns each ancient average one
+of four eras from its label tokens (matched after the country; when several match, the latest wins,
+so `LBA-EIA` is ancient). Explicit dates (`…BP`, `…CE`) override. Unmatched labels default to ancient.
+
+| era | rule | rows |
+|---|---|---|
+| prehistoric | Palaeolithic to Bronze Age codes (UP, Mesolithic, N/EN/MN/LN, CA, BA/EBA/MBA/LBA, cultures such as LBK, Corded Ware, Yamnaya), or dated before 800 BCE | 1,611 |
+| ancient | Iron Age to late antiquity (IA, Hallstatt, La Tene, Scythian, Roman, Antiquity, Han, Maya…), or 800 BCE to 500 CE | 1,044 |
+| medieval | Medieval, Viking, Avar, Byzantine, Tang…, Precolonial Americas, or 500 to 1500 CE | 1,109 |
+| early modern | Modern, Colonial, Ming/Qing, or after 1500 CE | 176 |
+
+The map never shows ancient samples; the era only labels them in search results and in the query header.

@@ -35,7 +35,8 @@ async function main() {
   pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
   const subOf = (p: Pop) => { const s = disp(p.core.startsWith(p.first + '_') ? p.core.slice(p.first.length + 1) : p.core === p.first ? '' : p.core); return p.profile ? `${s}${s ? ' ' : ''}(${p.profile.replace(/ Profile$/, '')})` : s }
-  const tags = (p: Pop) => [`n=${p.n}`, p.kind === 'a' ? 'ancient' : '', p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : '', flags(p)].filter(Boolean)
+  const ERA: Record<string, string> = { pre: 'Prehistoric', anc: 'Ancient', med: 'Medieval', mod: 'Early modern' }
+  const tags = (p: Pop) => [`n=${p.n}`, p.kind === 'a' ? ERA[p.era].toLowerCase() : '', p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : '', flags(p)].filter(Boolean)
   const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 22s7-7.1 7-12.5A7 7 0 0 0 5 9.5C5 14.9 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg>'
   const meta = (p: Pop) => `<span class="loc">${PIN}${esc(p.place ?? 'no location')}</span>` + tags(p).map(t => `<span>${t}</span>`).join('')
 
@@ -148,17 +149,21 @@ async function main() {
     const mean = mem[0].c.map((_, i) => mem.reduce((s, p) => s + p.n * p.c[i], 0) / tot)
     return mem.sort((x, y) => dist(x.c, mean) - dist(y.c, mean))[0]
   }
-  const starters = { m: [...groupN.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([f, n]) => ({ p: rep(f), name: disp(f), n })), a: uniq(pops.filter(p => p.kind === 'a' && clean(p)).sort(byN)).slice(0, 8).map(p => ({ p, name: disp(p.core), n: p.n })) }
   type Row = { p: Pop; name: string; n: number }
+  type Groups = Partial<Record<'m' | 'pre' | 'anc' | 'med' | 'mod', Row[]>>
   const rowOf = (p: Pop): Row => ({ p, name: disp(p.core), n: p.n })
-  function showSuggest(groups: { m: Row[]; a: Row[] }) {
-    suggest.innerHTML = ''
-    for (const kind of ['m', 'a'] as const) {
-      const list = groups[kind]; if (!list.length) continue
-      const hd = document.createElement('li'); hd.className = 'hd'; hd.textContent = kind === 'm' ? 'Present-day' : 'Ancient'; suggest.appendChild(hd)
+  const ERAS = ['pre', 'anc', 'med', 'mod'] as const
+  const ancientBy = (era: string) => uniq(pops.filter(p => p.kind === 'a' && clean(p) && p.era === era).sort(byN))
+  const starters: Groups = { m: [...groupN.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([f, n]) => ({ p: rep(f), name: disp(f), n })) }
+  for (const e of ERAS) starters[e] = ancientBy(e).slice(0, 4).map(rowOf)
+  function showSuggest(groups: Groups) {
+    suggest.innerHTML = ''; let any = false
+    for (const key of ['m', 'pre', 'anc', 'med', 'mod'] as const) {
+      const list = groups[key]; if (!list?.length) continue; any = true
+      const hd = document.createElement('li'); hd.className = 'hd'; hd.textContent = key === 'm' ? 'Present-day' : ERA[key]; suggest.appendChild(hd)
       for (const r of list) { const li = document.createElement('li'); li.innerHTML = `<span>${esc(r.name)}</span><span class="sub">n=${r.n}</span>`; li.onmousedown = () => { search.value = ''; suggest.hidden = true; selectPop(r.p, true) }; suggest.appendChild(li) }
     }
-    suggest.hidden = !groups.m.length && !groups.a.length
+    suggest.hidden = !any
   }
   search.oninput = search.onfocus = () => {
     const q = search.value.trim().toLowerCase().replace(/ /g, '_')
@@ -166,7 +171,9 @@ async function main() {
     const atWord = (p: Pop) => { const i = p.label.toLowerCase().indexOf(q); return i === 0 || p.label[i - 1] === '_' ? 0 : 1 }
     const rank = (a: Pop, b: Pop) => atWord(a) - atWord(b) || b.n - a.n
     const hits = pops.filter(p => p.label.toLowerCase().includes(q)).sort(rank)
-    showSuggest({ m: uniq(hits.filter(p => p.kind === 'm')).slice(0, 20).map(rowOf), a: uniq(hits.filter(p => p.kind === 'a')).slice(0, 20).map(rowOf) })
+    const g: Groups = { m: uniq(hits.filter(p => p.kind === 'm')).slice(0, 20).map(rowOf) }
+    for (const e of ERAS) g[e] = uniq(hits.filter(p => p.kind === 'a' && p.era === e)).slice(0, 12).map(rowOf)
+    showSuggest(g)
   }
   search.onblur = () => setTimeout(() => suggest.hidden = true, 150)
 

@@ -6,6 +6,7 @@ import numpy as np, pandas as pd
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
+from era import era
 
 FILES={"a":"data/Moriopoulos Collection 2025 - Ancients (No Sims) Averages.txt",
        "m":"data/Moriopoulos Collection 2025 - Moderns (No Sims) Averages.txt"}
@@ -29,7 +30,7 @@ for kind,p in FILES.items():
         rows.append(dict(label=label,kind=kind,n=n,core=core(label),
             o=bool(re.search(r"_o\d*(_\(|$)",base)), low="(low_res)" in base, cont="(contaminated)" in base,
             profile=prof.group(1).replace("_"," ") if prof else "",
-            first=core(label).split("_")[0],
+            first=core(label).split("_")[0], era=era(core(label)) if kind=="a" else "",
             **{c:float(v) for c,v in zip(PCS,parts[1:])}))
 df=pd.DataFrame(rows); df["id"]=np.arange(len(df))
 print("pops:",len(df))
@@ -83,7 +84,7 @@ for k,t in trees.items(): print("tree",k,"leaves",len(t["leaves"]),"root height"
 os.makedirs("app/public/data",exist_ok=True)
 def nz(v,f=lambda x:x): return None if pd.isna(v) else f(v)
 pops=[dict(id=int(r.id),label=r.label,core=r.core,kind=r.kind,n=int(r.n),o=bool(r.o),low=bool(r.low),cont=bool(r.cont),
-        profile=r.profile,first=r.first,
+        profile=r.profile,first=r.first,era=r.era,
         lat=nz(r.lat,lambda v:round(float(v),3)),lon=nz(r.lon,lambda v:round(float(v),3)),
         dlat=nz(r.dlat,lambda v:round(float(v),3)),dlon=nz(r.dlon,lambda v:round(float(v),3)),
         prec=nz(r.precision),place=nz(r.place),

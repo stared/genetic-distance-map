@@ -1,6 +1,7 @@
 export interface Pop {
   id: number; label: string; core: string; kind: 'm' | 'a'; n: number;
-  o: boolean; low: boolean; cont: boolean; profile: string; first: string;
+  o: boolean; low: boolean; cont: boolean; profile: string; first: string
+  era: '' | 'pre' | 'anc' | 'med' | 'mod'   // ancient samples only;
   lat: number | null; lon: number | null; dlat: number | null; dlon: number | null;
   prec: string | null; place: string | null; c: number[];
   region?: string;   // country-level name derived from place (set at load)
