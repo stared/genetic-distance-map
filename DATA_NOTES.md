@@ -48,7 +48,30 @@ Obtained 2025-09-04 from the Drive files linked in the thread (saved as plain te
 - **Metric:** plain 25-D Euclidean distance. Vahaduo prints it as `100*d` with a "%" sign and as raw `d`, e.g. "Distance 1.2623% / 0.01262311" (from the Vahaduo source). We report ×100 throughout.
 - Vahaduo tools (https://vahaduo.github.io/): Admixture JS (nnls/nMonte-style modelling + distances, the de-facto standard), Custom PCA, Global25 Views (16 regional 2-D projections), 3D PCA Viewer, G25 Download.
 
-### Geographic coordinates (to be built; not in any source above)
+### Geographic coordinates (LLM-assigned, 2025-09-04)
+
+All 6,020 rows have a point. Method: unique "core" labels (label minus n, outlier, low_res, contaminated and profile
+tokens; 2,691 ancient + 1,762 modern) were split into 11 chunks and geocoded from model knowledge by Claude
+subagents following `data/geo/GEOCODING_INSTRUCTIONS.md`; no web lookups. Output in `data/geo/chunks/*.csv`,
+merged into `data/geo/geocoded.csv` (columns: label, lat, lon, precision, place).
+
+| precision | rows | meaning |
+|---|---|---|
+| site | 2,577 | named archaeological site / town |
+| region | 884 | Lazio, Shandong, Catalonia… |
+| district | 733 | province / county |
+| ethnic | 633 | traditional homeland of a modern group |
+| country | 618 | country-level only |
+| guess | 575 | uncertain, best estimate (mostly minor sites in Tibet, Kazakhstan, Irkutsk, Xinjiang, Mingrelian villages, Manchu clans) |
+
+Sanity check: the geographic distance to each row's *genetic* nearest neighbour has median 405 km, 90th
+percentile 1,646 km. 131 rows are > 4,000 km from their genetic neighbour (`data/geo/suspicious_far_nn.csv`);
+inspection shows these are sparse-sampling cases (Americas, colonial-era European profiles in the Americas,
+diaspora groups), not geocoding errors. Known deliberate choices: Kendrick's Cave is placed in Wales although
+the label says England; Posusje is placed in Bosnia (eponymous site) although the label says Croatia.
+Co-located rows are jittered by up to ~0.1–0.3° for display only (`dlat`/`dlon` in `pops.json`).
+
+### Other geographic building blocks (not used yet)
 
 No maintained "G25 label → lat/lon" table exists publicly. Building blocks:
 - **AADR `.anno` file** (Reich Lab, Allen Ancient DNA Resource): per-sample lat/lon, locality, political entity, date, coverage. https://dataverse.harvard.edu/dataverse/reich_lab, paper https://www.nature.com/articles/s41597-024-03031-7. G25 ancient labels are AADR-derived but are not AADR IDs, so joining needs fuzzy label parsing (country + period + site).

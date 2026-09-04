@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>G25 map</title>
+<link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+<div id="app">
+  <aside id="panel">
+    <header>
+      <h1>G25 population map</h1>
+      <nav id="modes">
+        <button data-mode="sim" class="active">Similarity</button>
+        <button data-mode="clu">Clusters</button>
+        <button data-mode="drill">Drill-down</button>
+      </nav>
+      <div class="row">
+        <label><input type="checkbox" id="showM" checked /> modern</label>
+        <label><input type="checkbox" id="showA" checked /> ancient</label>
+        <label><input type="checkbox" id="showO" /> outliers / low_res</label>
+      </div>
+    </header>
+    <section id="mode-sim" class="mode">
+      <div class="search">
+        <input id="search" type="search" placeholder="Search population (e.g. Polish, Italy_Lazio_IA)…" autocomplete="off" />
+        <ul id="suggest" hidden></ul>
+      </div>
+      <p class="hint">Click a point or any place on the map. Distances are Euclidean on scaled G25, ×100 as in Vahaduo.</p>
+      <div class="row"><label>colour range 0–<span id="dmaxVal">20</span>: <input type="range" id="dmax" min="4" max="60" step="1" value="20" /></label></div>
+      <div id="query"></div>
+      <ol id="nearest"></ol>
+    </section>
+    <section id="mode-clu" class="mode" hidden>
+      <div class="row">
+        <label>tree:
+          <select id="treeSet"><option value="m">moderns</option><option value="a">ancients</option><option value="all">both</option></select>
+        </label>
+        <label>clusters: <span id="kVal">8</span> <input type="range" id="k" min="0" max="60" step="1" value="10" /></label>
+      </div>
+      <p class="hint">Ward tree cut into k clusters. Colours are hierarchical: nearby hues = nearby branches. Click a legend entry to zoom.</p>
+      <ul id="legend"></ul>
+    </section>
+    <section id="mode-drill" class="mode" hidden>
+      <div class="row">
+        <label>tree:
+          <select id="treeSet2"><option value="m">moderns</option><option value="a">ancients</option><option value="all">both</option></select>
+        </label>
+        <label>split into: <select id="splitM"><option>2</option><option selected>3</option><option>4</option></select></label>
+        <button id="up">↑ up</button>
+      </div>
+      <p class="hint">Start at the root. Click a point (or a group below) to zoom into that branch and split it again.</p>
+      <div id="crumbs"></div>
+      <ul id="children"></ul>
+    </section>
+    <footer>Data: <a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a> (no sims) on Eurogenes Global25. Locations are approximate, assigned by an LLM. </footer>
+  </aside>
+  <div id="map"></div>
+  <div id="tooltip" hidden></div>
+</div>
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

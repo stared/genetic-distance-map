@@ -2,3 +2,5 @@
 __pycache__/
 analysis/*.parquet
 analysis/*.npy
+app/node_modules/
+app/dist/
