@@ -49,6 +49,7 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
   // geometry after layout
   svg.setAttribute('width', String(box.clientWidth)); svg.setAttribute('height', String(box.scrollHeight))
   const center = (e: HTMLElement) => { const g = e.querySelector<HTMLElement>('.tg')!; return { x: e.offsetLeft + g.offsetLeft + g.offsetWidth / 2, y: e.offsetTop + g.offsetTop + g.offsetHeight / 2 } }
+  const swatchLeft = (e: HTMLElement) => { const s = e.querySelector<HTMLElement>('.sw'); return s ? e.offsetLeft + s.offsetLeft : null }
   const h0 = t.nodes[sel].height || 1, xj = (h: number) => X0 + (DX - X0) * (1 - Math.sqrt(Math.max(0, h) / h0))
   const pos = new Map<number, { x: number; y: number }>()
   const place = (n: number): { x: number; y: number } => {
@@ -67,7 +68,7 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
       else if (n === sel) line(p.x, Math.min(...cs.map(c => c.y)), p.x, Math.max(...cs.map(c => c.y)))
       else line(p.x, Math.min(...cs.map(c => c.y)), p.x, Math.max(...cs.map(c => c.y)))
       const px = n === sel && !atRoot ? center(selRow!).x : p.x
-      for (const c of cs) line(px, c.y, c.x - R, c.y)
+      for (const [i, c] of cs.entries()) { const r = rowOf.get(ks[i]), end = r ? swatchLeft(r) : null; line(px, c.y, end ?? c.x - R, c.y) }   // through the handle to the colour dot
       if (n !== sel && n !== t.root) {   // merge handle at the junction (none on the world root)
         const g = svgEl('g', { class: 'junction', transform: `translate(${p.x},${p.y})` })
         g.appendChild(svgEl('circle', { r: R }))
