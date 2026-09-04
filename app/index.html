@@ -41,13 +41,8 @@
   </aside>
   <div id="map">
     <div id="legend" hidden>
-      <div class="lt">Distance to <b id="lname"></b></div>
+      <div class="lt">Genetic distance to <b id="lname"></b>, on <select id="range"><option value="0.05">close</option><option value="0.25" selected>regional</option><option value="1">global</option></select> scale</div>
       <div class="lx"><span id="dmin">0</span><div class="ramp" id="ramp"></div><span id="dmaxv">20</span></div>
-      <div id="range" class="seg small">
-        <button data-q="0.05">Close</button>
-        <button data-q="0.25" class="active">Regional</button>
-        <button data-q="1">Global</button>
-      </div>
     </div>
   </div>
   <div id="tooltip" hidden></div>

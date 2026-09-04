@@ -127,8 +127,7 @@ async function main() {
     render()
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
-  document.querySelectorAll<HTMLButtonElement>('#range button').forEach(b => b.onclick = () => {
-    rangeQ = +b.dataset.q!; document.querySelectorAll<HTMLButtonElement>('#range button').forEach(x => x.classList.toggle('active', x === b)); renderSim() })
+  const rangeEl = $<HTMLSelectElement>('range'); rangeEl.onchange = () => { rangeQ = +rangeEl.value; renderSim() }
   kEl.oninput = renderClusters
   $('reset').onclick = () => { path = []; renderDrill(true) }
 
