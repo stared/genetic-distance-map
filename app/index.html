@@ -10,15 +10,15 @@
 <div id="app">
   <aside id="panel">
     <header>
-      <nav id="modes" class="tabs">
+      <div id="modes" class="row">
         <button data-mode="sim" class="active">Similarity</button>
         <button data-mode="clu">Clusters</button>
-        <button data-mode="drill">Drill-down</button>
-      </nav>
-      <div class="chips">
-        <button id="showM" class="chip on" aria-pressed="true"><span class="glyph m"></span>modern</button>
-        <button id="showA" class="chip on" aria-pressed="true"><span class="glyph a"></span>ancient</button>
-        <button id="showO" class="chip" aria-pressed="false">outliers</button>
+        <button data-mode="split">Split</button>
+      </div>
+      <div id="period" class="row">
+        <button data-period="m" class="active">Present-day</button>
+        <button data-period="a">Ancient</button>
+        <button data-period="all">All</button>
       </div>
     </header>
 
@@ -36,24 +36,12 @@
     </section>
 
     <section id="mode-clu" class="mode" hidden>
-      <div class="controls">
-        <label class="field"><span>Populations</span>
-          <select id="treeSet"><option value="m">modern</option><option value="a">ancient</option><option value="all">all</option></select>
-        </label>
-        <label class="field grow"><span>Clusters <b id="kVal">8</b></span><input type="range" id="k" min="0" max="60" step="1" value="10" /></label>
-      </div>
+      <label class="field"><span>Clusters <b id="kVal">8</b></span><input type="range" id="k" min="0" max="60" step="1" value="10" /></label>
       <div id="clutree" class="tree"></div>
     </section>
 
-    <section id="mode-drill" class="mode" hidden>
-      <div class="controls">
-        <label class="field"><span>Populations</span>
-          <select id="treeSet2"><option value="m">modern</option><option value="a">ancient</option><option value="all">all</option></select>
-        </label>
-        <label class="field"><span>Branches</span><select id="splitM"><option>2</option><option selected>3</option><option>4</option></select></label>
-        <button id="up" class="btn">Up</button>
-      </div>
-      <div id="crumbs" class="crumbs"></div>
+    <section id="mode-split" class="mode" hidden>
+      <div class="crumbrow"><div id="crumbs" class="crumbs"></div><button id="reset" class="btn">Reset</button></div>
       <div id="children" class="tree"></div>
     </section>
 

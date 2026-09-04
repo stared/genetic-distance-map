@@ -6,7 +6,7 @@ import { loadWorld } from './world'
 import { FlatMap, type PointStyle } from './flatmap'
 import { renderTree, nameOf } from './treeview'
 
-type Mode = 'sim' | 'clu' | 'drill'
+type Mode = 'sim' | 'clu' | 'split'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const disp = (s: string) => s.replace(/_/g, ' ')
 const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
@@ -30,10 +30,9 @@ async function main() {
 
   // ---------- shared state
   let mode: Mode = 'sim'
-  const chips = { m: $<HTMLButtonElement>('showM'), a: $<HTMLButtonElement>('showA'), o: $<HTMLButtonElement>('showO') }
-  const on = (b: HTMLButtonElement) => b.classList.contains('on')
+  let period: TreeSet = 'm'
   const visible = new Uint8Array(pops.length)
-  const isVisible = (p: Pop) => (p.kind === 'm' ? on(chips.m) : on(chips.a)) && (on(chips.o) || !(p.o || p.low || p.cont))
+  const isVisible = (p: Pop) => (period === 'all' || p.kind === period) && !(p.o || p.low || p.cont)
   const refreshVisible = () => pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
   const kindName = (p: Pop) => p.kind === 'm' ? 'modern' : 'ancient'
@@ -87,37 +86,36 @@ async function main() {
   }
 
   // ---------- clusters
-  const treeSet = $<HTMLSelectElement>('treeSet'), kEl = $<HTMLInputElement>('k')
+  const kEl = $<HTMLInputElement>('k')
   const kSteps = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 400, 500, 600, 800, 1000]
   kEl.max = String(kSteps.length - 1); kEl.value = '6'
   const expanded = new Set<number>()
   let clu: { tree: Tree; roots: number[]; assign: Map<number, number>; colors: Map<number, string> } | null = null
   function renderClusters() {
     refreshVisible()
-    const tree = trees[treeSet.value as TreeSet]; const k = kSteps[+kEl.value]; $('kVal').textContent = String(k)
+    const tree = trees[period]; const k = kSteps[+kEl.value]; $('kVal').textContent = String(k)
     const roots = tree.split(tree.root, k), assign = tree.assign(roots), colors = tree.colorMap(roots)
     if (!clu || clu.tree !== tree) { expanded.clear(); expanded.add(tree.root); const r = tree.nodes[tree.root]; expanded.add(r.left); expanded.add(r.right) }
     clu = { tree, roots, assign, colors }
-    paintCategories(treeSet.value as TreeSet, assign, roots.map(r => colors.get(r)!), () => false)
+    paintCategories(period, assign, roots.map(r => colors.get(r)!), () => false)
     const opts: Parameters<typeof renderTree>[1] = { tree, root: tree.root, cutRoots: new Set(roots), colors, byId, expanded, showRoot: false, visible: id => !!visible[id], onSelect: n => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)), onToggle: () => renderTree($('clutree'), opts) }
     renderTree($('clutree'), opts)
   }
 
-  // ---------- drill-down
-  const treeSet2 = $<HTMLSelectElement>('treeSet2'), splitM = $<HTMLSelectElement>('splitM')
+  // ---------- split
   let path: number[] = []
   let drill: { tree: Tree; children: number[]; assign: Map<number, number> } | null = null
   function renderDrill(zoom: boolean) {
     refreshVisible()
-    const tree = trees[treeSet2.value as TreeSet]
+    const tree = trees[period]
     if (!path.length || path[0] !== tree.root) path = [tree.root]
     const node = path[path.length - 1]
-    const children = tree.split(node, +splitM.value), assign = tree.assign(children), colors = tree.colorMap(children, node)
+    const children = tree.split(node, 3), assign = tree.assign(children), colors = tree.colorMap(children, node)
     drill = { tree, children, assign }
     const scope = tree.assign([node])
-    paintCategories(treeSet2.value as TreeSet, assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
+    paintCategories(period, assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
     const crumbs = $('crumbs'); crumbs.innerHTML = ''
-    path.forEach((n, i) => { const s = document.createElement('span'); s.textContent = i === 0 ? 'All' : nameOf(tree, n, byId, 2); s.onclick = () => { path = path.slice(0, i + 1); renderDrill(true) }; crumbs.appendChild(s) })
+    path.forEach((n, i) => { const s = document.createElement('span'); s.textContent = i === 0 ? 'World' : nameOf(tree, n, byId, 2); s.onclick = () => { path = path.slice(0, i + 1); renderDrill(true) }; crumbs.appendChild(s) })
     renderTree($('children'), { tree, root: node, cutRoots: new Set(children), colors, byId, expanded: new Set([node]), showRoot: false, flat: true, visible: id => !!visible[id], onSelect: n => descend(n), onToggle: () => {} })
     if (zoom) fitTo(tree.members(node).map(id => byId.get(id)!))
   }
@@ -125,6 +123,11 @@ async function main() {
 
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else if (mode === 'clu') renderClusters(); else renderDrill(false) }
+  function setPeriod(p: TreeSet) {
+    period = p; path = []
+    document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.classList.toggle('active', b.dataset.period === p))
+    if (mode === 'split') renderDrill(true); else render()
+  }
   function setMode(m: Mode) {
     mode = m
     document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m))
@@ -132,11 +135,10 @@ async function main() {
     render()
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
-  Object.values(chips).forEach(b => b.onclick = () => { b.classList.toggle('on'); b.setAttribute('aria-pressed', String(on(b))); render() })
+  document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.onclick = () => setPeriod(b.dataset.period as TreeSet))
   dmaxEl.onchange = dmaxEl.oninput = () => { if (mode === 'sim') renderSim() }
-  treeSet.onchange = renderClusters; kEl.oninput = renderClusters
-  treeSet2.onchange = () => { path = []; renderDrill(true) }; splitM.onchange = () => renderDrill(false)
-  $('up').onclick = () => { if (path.length > 1) { path.pop(); renderDrill(true) } }
+  kEl.oninput = renderClusters
+  $('reset').onclick = () => { path = []; renderDrill(true) }
 
   // search
   const search = $<HTMLInputElement>('search'), suggest = $<HTMLUListElement>('suggest')
@@ -155,13 +157,13 @@ async function main() {
     if (!p) { tip.hidden = true; return }
     let extra = ''
     if (mode === 'sim' && query) extra = `<br>distance ${d[p.id].toFixed(2)}`
-    const cl = mode === 'clu' ? clu : mode === 'drill' ? drill : null
+    const cl = mode === 'clu' ? clu : mode === 'split' ? drill : null
     if (cl) { const c = cl.assign.get(p.id); const roots = mode === 'clu' ? clu!.roots : drill!.children; if (c !== undefined) extra = '<br>branch: ' + esc(nameOf(cl.tree, roots[c], byId)) }
     tip.innerHTML = `<b>${esc(disp(p.core))}</b><br><span class="sub">${describe(p)}${extra}</span>`
     tip.hidden = false; tip.style.left = x + 14 + 'px'; tip.style.top = y + 14 + 'px'
   }
   map.onClick = (lng, lat, p) => {
-    if (mode === 'drill') {
+    if (mode === 'split') {
       if (!drill) return
       let c = p ? drill.assign.get(p.id) : undefined
       if (c === undefined) {
@@ -175,8 +177,9 @@ async function main() {
   // initial state from the URL hash, else the default query
   refreshVisible()
   const h = decodeURIComponent(location.hash.slice(1)).split('/')
-  if (h[0] === 'clu') { treeSet.value = h[1] || 'm'; const ki = kSteps.indexOf(+h[2]); if (ki >= 0) kEl.value = String(ki); setMode('clu') }
-  else if (h[0] === 'drill') { treeSet2.value = h[1] || 'm'; if (h[2]) splitM.value = h[2]; setMode('drill'); renderDrill(true) }
+  const per = (['m', 'a', 'all'] as TreeSet[]).includes(h[1] as TreeSet) ? h[1] as TreeSet : 'm'
+  if (h[0] === 'clu') { period = per; const ki = kSteps.indexOf(+h[2]); if (ki >= 0) kEl.value = String(ki); setPeriod(per); setMode('clu') }
+  else if (h[0] === 'split') { period = per; setPeriod(per); setMode('split'); renderDrill(true) }
   else { const p = pops.find(p => p.core === (h[0] === 'sim' && h[1] ? h[1] : DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
 }
 function haversine(a: number, b: number, c: number, dd: number) {
