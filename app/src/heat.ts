@@ -5,7 +5,7 @@ import type { Pop } from './types'
 export const W = 1024, H = 1024
 const SCALE = W / (2 * Math.PI)
 export const LAT_MAX = (2 * Math.atan(Math.exp((H / 2) / SCALE)) - Math.PI / 2) * 180 / Math.PI // ≈85.05°
-const K = 6, FADE_KM = 500, MAX_KM = 1500
+const K = 6, FADE_KM = 1500, MAX_KM = 2500
 /** colour ramp: t=0 close (red) … t=1 far (blue), fully saturated, no grey */
 export const ramp = (t: number) => interpolateTurbo(0.93 - 0.85 * t)
 
@@ -46,16 +46,17 @@ class KD {
   }
 }
 
-/** Raster over land: for every cell the K nearest unique locations with IDW weights and a distance fade. */
+/** neighbour field for one subset of locations: K nearest per land cell, IDW weights, distance fade */
+export interface Field { idx: Int32Array; wgt: Float32Array; fade: Uint8Array }
+
+/** Land raster + unique sample locations; neighbour fields are built lazily per subset (present-day / ancient). */
 export class HeatGrid {
-  idx = new Int32Array(W * H * K).fill(-1)
-  wgt = new Float32Array(W * H * K)
-  fade = new Uint8Array(W * H)          // 0 = no data / ocean, 255 = fully inside sampled area
   land = new Uint8Array(W * H)
   private locXYZ!: { X: Float64Array; Y: Float64Array; Z: Float64Array }
   locPops: number[][] = []              // location -> pop ids
   private locVal: Float32Array
   private locOk: Uint8Array
+  private fields = new Map<string, Field>()
   lut: Uint8ClampedArray
   canvas: HTMLCanvasElement
   img: ImageData
@@ -78,6 +79,7 @@ export class HeatGrid {
       for (const dx of [-W, 0, W]) { pts.forEach(([x, y], i) => i ? ctx.lineTo(x + dx, y) : ctx.moveTo(x + dx, y)); ctx.closePath() }
     }
     ctx.fill('nonzero')
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()   // islands smaller than a cell still register as land
     const land0 = ctx.getImageData(0, 0, W, H).data
     ctx.clearRect(0, 0, W, H)
     const land = this.land
@@ -96,64 +98,54 @@ export class HeatGrid {
     const X = new Float64Array(n), Y = new Float64Array(n), Z = new Float64Array(n)
     for (let i = 0; i < n; i++) { X[i] = Math.cos(lat[i]) * Math.cos(lon[i]); Y[i] = Math.cos(lat[i]) * Math.sin(lon[i]); Z[i] = Math.sin(lat[i]) }
     this.locXYZ = { X, Y, Z }
-    const kd = new KD(X, Y, Z)
+  }
+  /** neighbour field over the locations passing `keep` (cached by key) */
+  field(key: string, keep: (li: number) => boolean): Field {
+    const cached = this.fields.get(key); if (cached) return cached
+    const { X, Y, Z } = this.locXYZ
+    const sel: number[] = []; for (let li = 0; li < X.length; li++) if (keep(li)) sel.push(li)
+    const f: Field = { idx: new Int32Array(W * H * K).fill(-1), wgt: new Float32Array(W * H * K), fade: new Uint8Array(W * H) }
+    this.fields.set(key, f)
+    if (!sel.length) return f
+    const kd = new KD(Float64Array.from(sel, i => X[i]), Float64Array.from(sel, i => Y[i]), Float64Array.from(sel, i => Z[i]))
     const outI = new Int32Array(K), outD = new Float64Array(K)
     const chordToKm = (c2: number) => 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(c2) / 2))
     for (let r = 0; r < H; r++) {
       const cl = 2 * Math.atan(Math.exp((H / 2 - (r + 0.5)) / SCALE)) - Math.PI / 2, cosl = Math.cos(cl), sinl = Math.sin(cl)
       for (let cix = 0; cix < W; cix++) {
-        const cell = r * W + cix; if (!land[cell]) continue
+        const cell = r * W + cix; if (!this.land[cell]) continue
         const clon = (-180 + (cix + 0.5) * 360 / W) * Math.PI / 180
         const m = kd.query(cosl * Math.cos(clon), cosl * Math.sin(clon), sinl, K, outI, outD)
         const near = chordToKm(outD[0]); if (near > MAX_KM) continue
-        this.fade[cell] = near < FADE_KM ? 255 : Math.round(255 * (1 - (near - FADE_KM) / (MAX_KM - FADE_KM)))
-        for (let j = 0; j < m; j++) { const km = chordToKm(outD[j]); this.idx[cell * K + j] = outI[j]; this.wgt[cell * K + j] = 1 / ((km + 40) ** 2) }
+        f.fade[cell] = near < FADE_KM ? 255 : Math.round(255 * (1 - (near - FADE_KM) / (MAX_KM - FADE_KM)))
+        for (let j = 0; j < m; j++) { const km = chordToKm(outD[j]); f.idx[cell * K + j] = sel[outI[j]]; f.wgt[cell * K + j] = 1 / ((km + 40) ** 2) }
       }
     }
+    return f
   }
-  /** nearest location (restricted to locations passing `keep`) for every land cell within maxKm; -1 otherwise */
-  nearestGrid(keep: (li: number) => boolean, maxKm = 2500): Int32Array {
-    const { X, Y, Z } = this.locXYZ
-    const sel: number[] = []; for (let li = 0; li < X.length; li++) if (keep(li)) sel.push(li)
-    const kd = new KD(Float64Array.from(sel, i => X[i]), Float64Array.from(sel, i => Y[i]), Float64Array.from(sel, i => Z[i]))
-    const out = new Int32Array(W * H).fill(-1), oi = new Int32Array(1), od = new Float64Array(1)
-    const maxC2 = (2 * Math.sin(maxKm / 6371 / 2)) ** 2
-    if (!sel.length) return out
-    for (let r = 0; r < H; r++) {
-      const cl = 2 * Math.atan(Math.exp((H / 2 - (r + 0.5)) / SCALE)) - Math.PI / 2, cosl = Math.cos(cl), sinl = Math.sin(cl)
-      for (let cix = 0; cix < W; cix++) {
-        const cell = r * W + cix; if (!this.land[cell]) continue
-        const clon = (-180 + (cix + 0.5) * 360 / W) * Math.PI / 180
-        kd.query(cosl * Math.cos(clon), cosl * Math.sin(clon), sinl, 1, oi, od)
-        if (od[0] <= maxC2) out[cell] = sel[oi[0]]
-      }
-    }
-    return out
-  }
-  /** similarity: per-pop distances (×100), averaged over visible pops at each location */
-  renderHeat(d: Float32Array, visible: Uint8Array, dmax: number, alpha = 1) {
+  /** similarity: per-pop distances (×100), averaged over visible pops at each location, IDW-blended over K neighbours */
+  renderHeat(f: Field, d: Float32Array, visible: Uint8Array, dmax: number, alpha = 1) {
     this.locPops.forEach((ids, li) => { let s = 0, c = 0; for (const id of ids) if (visible[id]) { s += d[id]; c++ } this.locOk[li] = c ? 1 : 0; this.locVal[li] = c ? s / c : 0 })
     const px = this.img.data
     for (let cell = 0; cell < W * H; cell++) {
-      const o = cell * 4, f = this.fade[cell]
-      if (!f) { px[o + 3] = 0; continue }
+      const o = cell * 4, fd = f.fade[cell]
+      if (!fd) { px[o + 3] = 0; continue }
       let s = 0, sw = 0
-      for (let j = 0; j < K; j++) { const li = this.idx[cell * K + j]; if (li < 0) break; if (!this.locOk[li]) continue; const w = this.wgt[cell * K + j]; s += w * this.locVal[li]; sw += w }
+      for (let j = 0; j < K; j++) { const li = f.idx[cell * K + j]; if (li < 0) break; if (!this.locOk[li]) continue; const w = f.wgt[cell * K + j]; s += w * this.locVal[li]; sw += w }
       if (sw === 0) { px[o + 3] = 0; continue }
       const li = Math.round(Math.sqrt(Math.min(1, (s / sw) / dmax)) * 255) * 3
-      px[o] = this.lut[li]; px[o + 1] = this.lut[li + 1]; px[o + 2] = this.lut[li + 2]; px[o + 3] = f * alpha
+      px[o] = this.lut[li]; px[o + 1] = this.lut[li + 1]; px[o + 2] = this.lut[li + 2]; px[o + 3] = fd * alpha
     }
     this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }
-  /** categorical (Voronoi-style): each cell takes the category of its nearest location that has one */
-  renderCategories(locCat: Int32Array, palette: Uint8ClampedArray, nearest: Int32Array) {
+  /** categorical (Voronoi-style): each cell takes the category of its nearest location; -1 = leave unpainted */
+  renderCategories(f: Field, locCat: Int32Array, palette: Uint8ClampedArray) {
     const px = this.img.data
     for (let cell = 0; cell < W * H; cell++) {
-      const o = cell * 4
-      let li = nearest[cell], cat = li >= 0 ? locCat[li] : -1
-      if (cat < 0) for (let j = 0; j < K; j++) { li = this.idx[cell * K + j]; if (li < 0) break; if (locCat[li] >= 0) { cat = locCat[li]; break } }
+      const o = cell * 4, fd = f.fade[cell], li = f.idx[cell * K]
+      const cat = fd && li >= 0 ? locCat[li] : -1
       if (cat < 0) { px[o + 3] = 0; continue }
-      px[o] = palette[cat * 3]; px[o + 1] = palette[cat * 3 + 1]; px[o + 2] = palette[cat * 3 + 2]; px[o + 3] = 255
+      px[o] = palette[cat * 3]; px[o + 1] = palette[cat * 3 + 1]; px[o + 2] = palette[cat * 3 + 2]; px[o + 3] = fd
     }
     this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }

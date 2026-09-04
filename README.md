@@ -7,23 +7,30 @@ on Eurogenes Global25 coordinates. See `DATA_NOTES.md` for sources and conventio
 
 ## Views
 
-- **Similarity**: click a point, click anywhere on land, or search a population. Every population is
-  coloured by its G25 distance to the query (Euclidean on scaled coordinates, ×100 as in Vahaduo)
-  and an inverse-distance-weighted heatmap is drawn over land. Clicking on empty land builds a query
-  from the nearest placed populations. The list on the left is the ranked nearest populations.
-- **Clusters**: Ward hierarchical clustering (moderns / ancients / both) cut into k clusters.
-  Land is coloured Voronoi-style by the cluster of the nearest sampled location; colours are
-  hierarchical (hue divided along the tree, so nearby hues are nearby branches). The side panel is a
-  collapsible tree down to the cut.
-- **Drill-down**: start at the root, the tree is split into 2–4 branches; click a branch (region, point
-  or tree entry) to zoom into it and split it again. Breadcrumbs go back up.
+The map always shows present-day populations (outliers, low-resolution and contaminated entries are
+never drawn). Ancient samples are available only as similarity queries through the search box.
 
-Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan, wheel to zoom, no map
-library). Values live on a 1024×1024 Mercator raster; each cell holds its 6 nearest sampled locations
-(k-d tree on the sphere) with inverse-distance weights and a fade beyond 500–1500 km. The raster is drawn
-directly with the map transform and clipped to the vector coastline. The app opens on a default query.
+- **Similarity**: click a dot or search a population (present-day or ancient). Every present-day
+  population is coloured by its G25 distance to the query (Euclidean on scaled coordinates, ×100 as
+  in Vahaduo) and an inverse-distance-weighted heatmap is drawn over land. The colour scale runs from
+  the nearest population to the 25th-percentile distance by default and the upper bound is editable.
+  The list is the ranked nearest populations grouped by ethnonym. The empty search box offers the
+  most-sampled present-day groups (represented by their medoid entry) and the largest ancient samples.
+- **Clusters**: Ward hierarchical clustering of present-day populations cut into k clusters. Land is
+  coloured Voronoi-style by the cluster of the nearest sampled location; colours are hierarchical
+  (hue divided along the tree, so nearby hues are nearby branches). The panel is a collapsible tree
+  down to the cut.
+- **Split**: start at the world, the tree is split into three branches; click a branch (region, dot
+  or list entry) to zoom into it and split it again. Breadcrumbs and Reset go back up.
 
-URL hash state: `#sim/Polish`, `#clu/m/16`, `#split/a`.
+Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
+wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each cell holds its 6
+nearest shown locations (k-d tree on the sphere) with inverse-distance weights and a fade between
+1500 and 2500 km from the nearest sample. Coastlines are stroked into the raster land mask so
+islands smaller than a cell are still painted. The raster is drawn with the map transform and
+clipped to the vector coastline. The app opens on a default query.
+
+URL hash state: `#sim/Polish`, `#sim/Russia_Samara_EBA_Yamnaya`, `#clu/16`, `#split`.
 
 ## Run
 

@@ -17,7 +17,7 @@ export function nameOf(tree: Tree, node: number, byId: Map<number, Pop>, k = 3):
   return names.join(', ') + (scored.length > k ? ', …' : '')
 }
 export function longName(mem: Pop[]): string {
-  return [...counts(mem).entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([t, c]) => `${t.replace(/_/g, ' ')} ${c}`).join(' · ')
+  return [...counts(mem).entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([t, c]) => `${t.replace(/_/g, ' ')} ${c}`).join(', ')
 }
 /** collapsible tree of the cluster hierarchy down to the cut roots */
 export function renderTree(el: HTMLElement, o: TreeViewOpts) {

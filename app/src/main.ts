@@ -1,5 +1,5 @@
 import { rgb } from 'd3-color'
-import { dist, type Pop, type TreeData, type TreeSet } from './types'
+import { dist, type Pop, type TreeData } from './types'
 import { Tree } from './tree'
 import { HeatGrid, ramp } from './heat'
 import { loadWorld } from './world'
@@ -15,14 +15,14 @@ const DEFAULT_QUERY = 'Polish'
 async function main() {
   const [pops, treesRaw, world] = await Promise.all([
     fetch('./data/pops.json').then(r => r.json()) as Promise<Pop[]>,
-    fetch('./data/trees.json').then(r => r.json()) as Promise<Record<TreeSet, TreeData>>,
+    fetch('./data/trees.json').then(r => r.json()) as Promise<Record<'m' | 'a' | 'all', TreeData>>,
     loadWorld()])
   for (const p of pops) { const parts = (p.place ?? '').split(',').map(x => x.replace(/\(.*?\)/g, '').trim()).filter(Boolean); p.region = parts.length ? parts[parts.length - 1] : p.first }
   const byId = new Map(pops.map(p => [p.id, p]))
-  const trees: Record<TreeSet, Tree> = { m: new Tree(treesRaw.m), a: new Tree(treesRaw.a), all: new Tree(treesRaw.all) }
+  const tree = new Tree(treesRaw.m)   // the map always shows present-day populations; ancient samples are queries only
   const heat = new HeatGrid(pops, world.landGeo)
   const map = new FlatMap($('map'), pops, world.landGeo, world.borders, heat)
-  ;(window as any).__dbg = { map, pops, heat, trees, world }
+  ;(window as any).__dbg = { map, pops, heat, tree, world }
   const R_M = 3.2, R_A = 2.6
   const setPoints = (color: (p: Pop) => string | null, alpha: (p: Pop) => number) => {
     map.state.styles = pops.map(p => { const c = color(p); return c ? { color: c, alpha: alpha(p), r: p.kind === 'm' ? R_M : R_A } as PointStyle : null }); map.request() }
@@ -30,58 +30,57 @@ async function main() {
 
   // ---------- shared state
   let mode: Mode = 'sim'
-  let period: 'm' | 'a' = 'm'
   const visible = new Uint8Array(pops.length)
-  const isVisible = (p: Pop) => p.kind === period && !(p.o || p.low || p.cont)
-  const refreshVisible = () => pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
+  const isVisible = (p: Pop) => p.kind === 'm' && !(p.o || p.low || p.cont)
+  pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
-  const kindName = (p: Pop) => p.kind === 'm' ? 'modern' : 'ancient'
   const subOf = (p: Pop) => { const s = disp(p.core.startsWith(p.first + '_') ? p.core.slice(p.first.length + 1) : p.core === p.first ? '' : p.core); return p.profile ? `${s}${s ? ' ' : ''}(${p.profile.replace(/ Profile$/, '')})` : s }
-  const describe = (p: Pop) => `${kindName(p)} · n ${p.n}${p.profile ? ' · ' + esc(p.profile) : ''}${flags(p) ? ' · ' + flags(p) : ''}<br>${esc(p.place ?? 'no location')}`
+  const describe = (p: Pop) => `${esc(p.place ?? 'no location')}<br>${[`n=${p.n}`, p.kind === 'a' ? 'ancient' : '', p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : '', flags(p)].filter(Boolean).join(', ')}`
 
   // ---------- similarity
-  let query: { name: string; sub: string; c: number[] } | null = null
-  const d = new Float32Array(pops.length)
-  const dmaxEl = $<HTMLInputElement>('dmax')
+  let query: { name: string; sub: string; c: number[]; fresh: boolean } | null = null
+  const d = new Float32Array(pops.length), raw = new Float32Array(pops.length)
+  let d0 = 0                                   // colour scale runs from d0 (nearest shown population) to dmax
+  const dmaxEl = $<HTMLInputElement>('dmax'), dminEl = $('dmin')
   $('ramp').style.background = `linear-gradient(to right, ${[0, .1, .2, .35, .5, .7, 1].map(t => ramp(Math.sqrt(t))).join(',')})`
   function renderSim() {
-    refreshVisible()
     if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; return }
-    const dmax = Math.max(1, +dmaxEl.value || 20)
-    for (const p of pops) d[p.id] = 100 * dist(query.c, p.c)
-    heat.renderHeat(d, visible, dmax); map.setRaster(0.7)
-    setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], dmax) : null, () => 1)
+    for (const p of pops) raw[p.id] = 100 * dist(query.c, p.c)
+    const sorted = pops.filter(p => visible[p.id]).sort((a, b) => raw[a.id] - raw[b.id])
+    d0 = Math.floor(raw[sorted[0].id])
+    if (query.fresh) { query.fresh = false; dmaxEl.value = String(Math.min(99, Math.max(d0 + 5, Math.round(raw[sorted[Math.floor(sorted.length / 4)].id])))) }
+    const dmax = Math.max(d0 + 1, +dmaxEl.value || 20), span = dmax - d0
+    dminEl.textContent = String(d0)
+    for (const p of pops) d[p.id] = Math.max(0, raw[p.id] - d0)
+    heat.renderHeat(field, d, visible, span); map.setRaster(0.7)
+    setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], span) : null, () => 1)
     $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="sub">${query.sub}</div>`
-    const top = pops.filter(p => visible[p.id]).sort((a, b) => d[a.id] - d[b.id]).slice(0, 80)
+    const top = sorted.slice(0, 80)
     const groups = new Map<string, Pop[]>(); top.forEach(p => { const g = groups.get(p.first); g ? g.push(p) : groups.set(p.first, [p]) })
     const list = $('nearest'); list.innerHTML = ''
     for (const [first, mem] of groups) {
       const best = mem[0]
       const g = document.createElement('div'); g.className = 'grp'
       const all = mem.filter(p => subOf(p)), shown = all.slice(0, 8)
-      const subs = shown.map(p => `<span data-id="${p.id}" title="${esc(p.label)}">${esc(subOf(p))} <i>${d[p.id].toFixed(2)}</i></span>`).join(' · ') + (all.length > shown.length ? ` · <span class="n">+${all.length - shown.length} more</span>` : '')
-      g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], dmax)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${d[best.id].toFixed(2)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
+      const subs = shown.map(p => `<span data-id="${p.id}" title="${esc(p.label)}">${esc(subOf(p))} <i>${raw[p.id].toFixed(2)}</i></span>`).join('') + (all.length > shown.length ? `<span class="n">+${all.length - shown.length} more</span>` : '')
+      g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], span)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${raw[best.id].toFixed(2)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
       g.addEventListener('click', e => { const t = (e.target as HTMLElement).closest('[data-id]') as HTMLElement | null; selectPop(byId.get(t ? +t.dataset.id! : best.id)!, true) })
       list.appendChild(g)
     }
   }
   function selectPop(p: Pop, fly: boolean) {
-    query = { name: disp(p.core), sub: describe(p), c: p.c }
+    query = { name: disp(p.core), sub: describe(p), c: p.c, fresh: true }
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
   // ---------- categorical colouring shared by clusters / drill-down
-  const nearestCache = new Map<string, Int32Array>()
-  function nearestFor(set: TreeSet) {
-    let g = nearestCache.get(set)
-    if (!g) { const inSet = (p: Pop) => p.kind === set; g = heat.nearestGrid(li => heat.locPops[li].some(id => inSet(byId.get(id)!))); nearestCache.set(set, g) }
-    return g
-  }
-  function paintCategories(set: TreeSet, assign: Map<number, number>, colors: string[], inScope: (p: Pop) => boolean) {
+  /** neighbour field over the locations that have at least one shown population */
+  const field = heat.field('m', li => heat.locPops[li].some(id => visible[id]))
+  function paintCategories(assign: Map<number, number>, colors: string[], inScope: (p: Pop) => boolean) {
     const locCat = new Int32Array(heat.locPops.length).fill(-1)
     heat.locPops.forEach((ids, li) => { const cnt = new Map<number, number>(); for (const id of ids) { if (!visible[id]) continue; const c = assign.get(id); if (c !== undefined) cnt.set(c, (cnt.get(c) ?? 0) + 1) } let best = -1, bc = 0; cnt.forEach((v, k) => { if (v > bc) { bc = v; best = k } }); locCat[li] = best })
     const pal = new Uint8ClampedArray(colors.length * 3); colors.forEach((c, i) => { const r = rgb(c); pal[i * 3] = r.r; pal[i * 3 + 1] = r.g; pal[i * 3 + 2] = r.b })
-    heat.renderCategories(locCat, pal, nearestFor(set)); map.setRaster(0.75)
+    heat.renderCategories(field, locCat, pal); map.setRaster(0.75)
     setPoints(p => { if (!visible[p.id]) return null; const c = assign.get(p.id); return c !== undefined ? colors[c] : inScope(p) ? '#71717a' : null }, p => assign.has(p.id) ? 1 : 0.5)
   }
 
@@ -90,44 +89,36 @@ async function main() {
   const kSteps = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 400, 500, 600, 800, 1000]
   kEl.max = String(kSteps.length - 1); kEl.value = '6'
   const expanded = new Set<number>()
-  let clu: { tree: Tree; roots: number[]; assign: Map<number, number>; colors: Map<number, string> } | null = null
+  let clu: { roots: number[]; assign: Map<number, number>; colors: Map<number, string> } | null = null
+  { expanded.add(tree.root); const r = tree.nodes[tree.root]; expanded.add(r.left); expanded.add(r.right) }
   function renderClusters() {
-    refreshVisible()
-    const tree = trees[period]; const k = kSteps[+kEl.value]; $('kVal').textContent = String(k)
+    const k = kSteps[+kEl.value]; $('kVal').textContent = String(k)
     const roots = tree.split(tree.root, k), assign = tree.assign(roots), colors = tree.colorMap(roots)
-    if (!clu || clu.tree !== tree) { expanded.clear(); expanded.add(tree.root); const r = tree.nodes[tree.root]; expanded.add(r.left); expanded.add(r.right) }
-    clu = { tree, roots, assign, colors }
-    paintCategories(period, assign, roots.map(r => colors.get(r)!), () => false)
+    clu = { roots, assign, colors }
+    paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
     const opts: Parameters<typeof renderTree>[1] = { tree, root: tree.root, cutRoots: new Set(roots), colors, byId, expanded, showRoot: false, visible: id => !!visible[id], onSelect: n => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)), onToggle: () => renderTree($('clutree'), opts) }
     renderTree($('clutree'), opts)
   }
 
   // ---------- split
   let path: number[] = []
-  let drill: { tree: Tree; children: number[]; assign: Map<number, number> } | null = null
+  let drill: { children: number[]; assign: Map<number, number> } | null = null
   function renderDrill(zoom: boolean) {
-    refreshVisible()
-    const tree = trees[period]
-    if (!path.length || path[0] !== tree.root) path = [tree.root]
+    if (!path.length) path = [tree.root]
     const node = path[path.length - 1]
     const children = tree.split(node, 3), assign = tree.assign(children), colors = tree.colorMap(children, node)
-    drill = { tree, children, assign }
+    drill = { children, assign }
     const scope = tree.assign([node])
-    paintCategories(period, assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
+    paintCategories(assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
     const crumbs = $('crumbs'); crumbs.innerHTML = ''
     path.forEach((n, i) => { const s = document.createElement('span'); s.textContent = i === 0 ? 'World' : nameOf(tree, n, byId, 2); s.onclick = () => { path = path.slice(0, i + 1); renderDrill(true) }; crumbs.appendChild(s) })
     renderTree($('children'), { tree, root: node, cutRoots: new Set(children), colors, byId, expanded: new Set([node]), showRoot: false, flat: true, visible: id => !!visible[id], onSelect: n => descend(n), onToggle: () => {} })
     if (zoom) fitTo(tree.members(node).map(id => byId.get(id)!))
   }
-  function descend(node: number) { if (!drill || drill.tree.isLeaf(node)) return; path.push(node); renderDrill(true) }
+  function descend(node: number) { if (!drill || tree.isLeaf(node)) return; path.push(node); renderDrill(true) }
 
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else if (mode === 'clu') renderClusters(); else renderDrill(false) }
-  function setPeriod(p: 'm' | 'a') {
-    period = p; path = []
-    document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.classList.toggle('active', b.dataset.period === p))
-    if (mode === 'split') renderDrill(true); else render()
-  }
   function setMode(m: Mode) {
     mode = m
     document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m))
@@ -135,19 +126,42 @@ async function main() {
     render()
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
-  document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.onclick = () => setPeriod(b.dataset.period as 'm' | 'a'))
   dmaxEl.onchange = dmaxEl.oninput = () => { if (mode === 'sim') renderSim() }
   kEl.oninput = renderClusters
   $('reset').onclick = () => { path = []; renderDrill(true) }
 
   // search
   const search = $<HTMLInputElement>('search'), suggest = $<HTMLUListElement>('suggest')
-  search.oninput = () => {
-    const q = search.value.trim().toLowerCase().replace(/ /g, '_'); suggest.innerHTML = ''
-    if (q.length < 2) { suggest.hidden = true; return }
-    const hits = pops.filter(p => p.label.toLowerCase().includes(q)).sort((a, b) => (a.label.toLowerCase().indexOf(q) - b.label.toLowerCase().indexOf(q)) || b.n - a.n).slice(0, 40)
-    for (const p of hits) { const li = document.createElement('li'); li.innerHTML = `<span class="sw ${p.kind}" style="background:${p.kind === 'm' ? '#f4f4f5' : '#a1a1aa'}"></span><span>${esc(disp(p.core))}</span><span class="sub">n ${p.n}</span>`; li.onmousedown = () => { search.value = ''; suggest.hidden = true; selectPop(p, true) }; suggest.appendChild(li) }
-    suggest.hidden = hits.length === 0
+  const clean = (p: Pop) => !(p.o || p.low || p.cont)
+  const byN = (a: Pop, b: Pop) => b.n - a.n
+  const uniq = (list: Pop[]) => { const seen = new Set<string>(); return list.filter(p => !seen.has(p.core) && seen.add(p.core)) }
+  // most-sampled present-day groups (all their subpopulations counted), represented by their main entry
+  const groupN = new Map<string, number>(); pops.filter(p => p.kind === 'm' && clean(p)).forEach(p => groupN.set(p.first, (groupN.get(p.first) ?? 0) + p.n))
+  // a group's representative: the member closest to the group's sample-weighted mean (medoid)
+  const rep = (first: string) => {
+    const mem = pops.filter(p => p.kind === 'm' && clean(p) && p.first === first), tot = mem.reduce((s, p) => s + p.n, 0)
+    const mean = mem[0].c.map((_, i) => mem.reduce((s, p) => s + p.n * p.c[i], 0) / tot)
+    return mem.sort((x, y) => dist(x.c, mean) - dist(y.c, mean))[0]
+  }
+  const starters = { m: [...groupN.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([f, n]) => ({ p: rep(f), name: disp(f), n })), a: uniq(pops.filter(p => p.kind === 'a' && clean(p)).sort(byN)).slice(0, 8).map(p => ({ p, name: disp(p.core), n: p.n })) }
+  type Row = { p: Pop; name: string; n: number }
+  const rowOf = (p: Pop): Row => ({ p, name: disp(p.core), n: p.n })
+  function showSuggest(groups: { m: Row[]; a: Row[] }) {
+    suggest.innerHTML = ''
+    for (const kind of ['m', 'a'] as const) {
+      const list = groups[kind]; if (!list.length) continue
+      const hd = document.createElement('li'); hd.className = 'hd'; hd.textContent = kind === 'm' ? 'Present-day' : 'Ancient'; suggest.appendChild(hd)
+      for (const r of list) { const li = document.createElement('li'); li.innerHTML = `<span>${esc(r.name)}</span><span class="sub">n=${r.n}</span>`; li.onmousedown = () => { search.value = ''; suggest.hidden = true; selectPop(r.p, true) }; suggest.appendChild(li) }
+    }
+    suggest.hidden = !groups.m.length && !groups.a.length
+  }
+  search.oninput = search.onfocus = () => {
+    const q = search.value.trim().toLowerCase().replace(/ /g, '_')
+    if (!q.length) { showSuggest(starters); return }
+    const atWord = (p: Pop) => { const i = p.label.toLowerCase().indexOf(q); return i === 0 || p.label[i - 1] === '_' ? 0 : 1 }
+    const rank = (a: Pop, b: Pop) => atWord(a) - atWord(b) || b.n - a.n
+    const hits = pops.filter(p => p.label.toLowerCase().includes(q)).sort(rank)
+    showSuggest({ m: uniq(hits.filter(p => p.kind === 'm')).slice(0, 20).map(rowOf), a: uniq(hits.filter(p => p.kind === 'a')).slice(0, 20).map(rowOf) })
   }
   search.onblur = () => setTimeout(() => suggest.hidden = true, 150)
 
@@ -156,9 +170,9 @@ async function main() {
   map.onHover = (p, x, y) => {
     if (!p) { tip.hidden = true; return }
     let extra = ''
-    if (mode === 'sim' && query) extra = `<br>distance ${d[p.id].toFixed(2)}`
+    if (mode === 'sim' && query) extra = `<br>distance ${raw[p.id].toFixed(2)}`
     const cl = mode === 'clu' ? clu : mode === 'split' ? drill : null
-    if (cl) { const c = cl.assign.get(p.id); const roots = mode === 'clu' ? clu!.roots : drill!.children; if (c !== undefined) extra = '<br>branch: ' + esc(nameOf(cl.tree, roots[c], byId)) }
+    if (cl) { const c = cl.assign.get(p.id); const roots = mode === 'clu' ? clu!.roots : drill!.children; if (c !== undefined) extra = '<br>branch: ' + esc(nameOf(tree, roots[c], byId)) }
     tip.innerHTML = `<b>${esc(disp(p.core))}</b><br><span class="sub">${describe(p)}${extra}</span>`
     tip.hidden = false; tip.style.left = x + 14 + 'px'; tip.style.top = y + 14 + 'px'
   }
@@ -175,11 +189,9 @@ async function main() {
     if (p) selectPop(p, false)
   }
   // initial state from the URL hash, else the default query
-  refreshVisible()
   const h = decodeURIComponent(location.hash.slice(1)).split('/')
-  const per: 'm' | 'a' = h[1] === 'a' ? 'a' : 'm'
-  if (h[0] === 'clu') { period = per; const ki = kSteps.indexOf(+h[2]); if (ki >= 0) kEl.value = String(ki); setPeriod(per); setMode('clu') }
-  else if (h[0] === 'split') { period = per; setPeriod(per); setMode('split'); renderDrill(true) }
+  if (h[0] === 'clu') { const ki = kSteps.indexOf(+h[1]); if (ki >= 0) kEl.value = String(ki); setMode('clu') }
+  else if (h[0] === 'split') { setMode('split'); renderDrill(true) }
   else { const p = pops.find(p => p.core === (h[0] === 'sim' && h[1] ? h[1] : DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
 }
 function haversine(a: number, b: number, c: number, dd: number) {

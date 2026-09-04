@@ -10,14 +10,10 @@
 <div id="app">
   <aside id="panel">
     <header>
-      <div id="modes" class="tabs">
+      <div id="modes" class="seg">
         <button data-mode="sim" class="active">Similarity</button>
         <button data-mode="clu">Clusters</button>
         <button data-mode="split">Split</button>
-      </div>
-      <div id="period" class="period">
-        <button data-period="m" class="active">Present-day populations</button>
-        <button data-period="a">Ancient samples</button>
       </div>
     </header>
 
@@ -28,7 +24,7 @@
       </div>
       <div id="query" class="query"></div>
       <div class="legend">
-        <div class="legend-head"><span>Distance</span><span class="legend-max">0 – <input type="number" id="dmax" min="2" max="80" step="1" value="20" /></span></div>
+        <div class="legend-head"><span>Distance</span><span class="legend-max"><span id="dmin">0</span> – <input type="number" id="dmax" min="1" max="99" step="1" value="20" /></span></div>
         <div class="ramp" id="ramp"></div>
       </div>
       <div id="nearest" class="list"></div>
