@@ -20,15 +20,15 @@ never drawn). Ancient samples are available only as similarity queries through t
   (prehistoric, ancient, medieval, early modern) are searchable, and words combine ("medieval poland").
 - **Clusters**: Ward hierarchical clustering of present-day populations. The map is coloured
   Voronoi-style by the cluster of the nearest sampled location, with hierarchical hues (nearby hues are
-  nearby branches). The panel is the tree itself, pruned to what matters: the path down to the selected branch,
-  the selected branch (lit) and its clusters. Rows are indented in proportion to the square root of Ward
-  distance, rescaled to the selected branch, and joined by connector lines, so it reads as a dendrogram.
-  + splits a cluster into its two children, − merges a split back. Clicking a row (or a region on the
-  map) selects that branch: the map zooms to it, its clusters take the whole hue circle and everything
-  else goes grey; clicking it again returns to the world. Branches that merely repeat their parent's name are folded into it. Hovering a
-  row highlights that cluster's dots, and the browser Back button undoes any step. Branches are named by
-  the areas they hold most of (continents when they own them, subregions otherwise, derived from
-  coordinates in `app/src/regions.ts`). It opens with the world in 8 clusters.
+  nearby branches). The panel is a dendrogram of the selected branch: one aligned row per cluster with
+  ⊕ (split in two), swatch and name; ⊖ junctions between them (merge back) sit left in proportion to the
+  square root of Ward distance. Above it two rows: the branch one level up (muted, click to go there) and
+  the selected branch (bold, with its own ⊕/⊖). Clicking a cluster row or a region on the map selects it:
+  the map zooms to it, its clusters take the whole hue circle and everything else goes grey; a second
+  click on the region splits it. Hovering a row highlights that cluster's dots; the browser Back button
+  undoes any step. Branches are named by the areas they hold most of (continents when they own them,
+  subregions otherwise, derived from coordinates in `app/src/regions.ts`). It opens with the world in 8
+  clusters.
 
 Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
 wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each cell holds its 6

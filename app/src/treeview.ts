@@ -1,66 +1,82 @@
 import type { Tree } from './tree'
 
-export interface TreeListOpts {
+export interface TreeViewOpts {
   tree: Tree; open: Set<number>; focus: number; colors: Map<number, string>
   name: (node: number) => string; hasMembers: (node: number) => boolean
-  onSelect: (node: number) => void; onToggle: (node: number) => void; onHover: (node: number | null) => void
+  onSelect: (node: number) => void; onSplit: (node: number) => void; onMerge: (node: number) => void; onHover: (node: number | null) => void
 }
 const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
 const NS = 'http://www.w3.org/2000/svg'
-const line = (x1: number, y1: number, x2: number, y2: number) => { const e = document.createElementNS(NS, 'line'); e.setAttribute('x1', String(x1)); e.setAttribute('y1', String(y1)); e.setAttribute('x2', String(x2)); e.setAttribute('y2', String(y2)); return e }
+const svgEl = (tag: string, attrs: Record<string, string | number>) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v)); return e }
+const X0 = 8, DX = 96, R = 8   // selected node's circle x, cluster column x, circle radius
 
-/** The cluster tree, pruned to what matters: the path down to the selected branch, the selected branch (lit),
- *  and its clusters. Rows are indented in proportion to the square root of Ward distance and joined by
- *  connector lines. + splits a cluster, − merges it back, clicking a name selects it (again: back to world). */
-export function renderTreeList(el: HTMLElement, o: TreeListOpts) {
+/** Two rows, then a dendrogram.  Row 1 (muted): the branch one level up, click to go there.  Row 2 (bold): the
+ *  selected branch.  Below it its clusters, one aligned row each with ⊕ (split), swatch and name; junctions between
+ *  them are ⊖ circles (merge) placed left in proportion to the square root of Ward distance. */
+export function renderTree(el: HTMLElement, o: TreeViewOpts) {
   const t = o.tree
   el.innerHTML = ''
   const box = document.createElement('div'); box.className = 'tlist'
-  const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'links')
-  box.appendChild(svg); el.appendChild(box)
-  const IND = 120, STEP = 14
-  // indentation: square root of Ward distance, scaled to the selected branch so its splits fill the width
-  const hTop = t.nodes[o.focus].height || 1
-  const path = o.focus === t.root ? [] : t.ancestors(o.focus).slice(1, -1).filter((n, i, a) => o.name(n) !== o.name(i === a.length - 1 ? o.focus : a[i + 1]))
-  const base = path.length * STEP
-  const x = (n: number) => base + Math.round(IND * (1 - Math.sqrt(Math.max(0, t.nodes[n].height) / hTop)))
-  const xOf = new Map<number, number>()
-  const rowOf = new Map<number, HTMLElement>(), kidsOf = new Map<number, number[]>()
+  const svg = svgEl('svg', { class: 'links' }); box.appendChild(svg); el.appendChild(box)
+  const circle = (sign: string, title: string) => `<span class="tg" title="${esc(title)}">${sign}</span>`
+  const mkRow = (cls: string, html: string, left: number) => { const e = document.createElement('div'); e.className = 'trow ' + cls; e.style.paddingLeft = left + 'px'; e.innerHTML = html; box.appendChild(e); return e }
+  const sel = o.focus, atRoot = sel === t.root
+  let selRow: HTMLElement | null = null, upRow: HTMLElement | null = null
+  if (!atRoot) {
+    let parent = t.nodes[sel].parent   // one level up, skipping ancestors that only repeat this branch's name
+    while (parent !== t.root && o.name(parent) === o.name(sel)) parent = t.nodes[parent].parent
+    const up = upRow = mkRow('anc', `<span class="tg dot"></span><span class="name">${esc(parent === t.root ? 'World' : o.name(parent))}</span>`, X0 - R)
+    up.onclick = () => o.onSelect(parent)
+    const isOpen = o.open.has(sel) && !t.isLeaf(sel)
+    selRow = mkRow('on', (t.isLeaf(sel) ? '<span class="tg none"></span>' : circle(isOpen ? '−' : '+', isOpen ? 'Merge into one cluster' : 'Split in two'))
+      + (isOpen ? '' : `<span class="sw" style="background:${o.colors.get(sel) ?? '#999'}"></span>`) + `<span class="name">${esc(o.name(sel))}</span>`, X0 - R)
+    if (!t.isLeaf(sel)) selRow.querySelector<HTMLElement>('.tg')!.onclick = e => { e.stopPropagation(); isOpen ? o.onMerge(sel) : o.onSplit(sel) }
+    selRow.onclick = () => o.onSelect(sel)
+    selRow.onmouseenter = () => o.onHover(sel); selRow.onmouseleave = () => o.onHover(null)
+  }
+  // cluster rows in tree order
+  const rowOf = new Map<number, HTMLElement>()
   const kids = (n: number) => { const nd = t.nodes[n]; return [nd.left, nd.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size).filter(c => o.hasMembers(c)) }
-  const row = (n: number, vparent: number, cls: string, xp = x(n)) => {
-    const leaf = t.isLeaf(n), isOpen = o.open.has(n) && !leaf, cut = !isOpen
-    if (vparent >= 0) kidsOf.get(vparent)!.push(n)
-    kidsOf.set(n, []); xOf.set(n, xp)
-    const e = document.createElement('div'); e.className = 'trow ' + cls + (cut ? ' cut' : '')
-    e.style.paddingLeft = xp + 'px'
-    e.innerHTML = (leaf ? '<span class="tg none"></span>' : `<span class="tg" title="${isOpen ? 'Merge back' : 'Split in two'}">${isOpen ? '−' : '+'}</span>`)
-      + (cut ? `<span class="sw" style="background:${o.colors.get(n) ?? '#999'}"></span>` : '')
-      + `<span class="name">${esc(o.name(n))}</span>`
-    if (!leaf) e.querySelector<HTMLElement>('.tg')!.onclick = ev => { ev.stopPropagation(); o.onToggle(n) }
-    e.onclick = () => o.onSelect(n)
-    e.onmouseenter = () => o.onHover(n); e.onmouseleave = () => o.onHover(null)
-    box.appendChild(e); rowOf.set(n, e)
-    return isOpen
+  const walk = (n: number) => {
+    if (o.open.has(n) && !t.isLeaf(n)) { kids(n).forEach(walk); return }
+    const row = mkRow('cut', (t.isLeaf(n) ? '<span class="tg none"></span>' : circle('+', 'Split in two')) + `<span class="sw" style="background:${o.colors.get(n) ?? '#999'}"></span><span class="name">${esc(o.name(n))}</span>`, DX - R)
+    if (!t.isLeaf(n)) row.querySelector<HTMLElement>('.tg')!.onclick = e => { e.stopPropagation(); o.onSplit(n) }
+    row.onclick = () => o.onSelect(n)
+    row.onmouseenter = () => o.onHover(n); row.onmouseleave = () => o.onHover(null)
+    rowOf.set(n, row)
   }
-  // the subtree of n; an open branch that just repeats its parent's name is folded into it
-  const sub = (n: number, vparent: number) => {
-    if (o.open.has(n) && !t.isLeaf(n) && vparent >= 0 && o.name(n) === o.name(vparent)) { for (const c of kids(n)) sub(c, vparent); return }
-    if (row(n, vparent, '')) for (const c of kids(n)) sub(c, n)
-  }
-  if (o.focus === t.root) for (const c of kids(t.root)) sub(c, -1)
-  else {
-    // path from the top to the selected branch as a short stair, then the branch itself, lit
-    let vp = -1
-    path.forEach((n, i) => { row(n, vp, 'anc', i * STEP); vp = n })
-    if (row(o.focus, vp, 'on')) for (const c of kids(o.focus)) sub(c, o.focus)
-  }
-  // connector lines after layout, attached to the circles: down from the parent's circle, into each child's circle
+  if (o.open.has(sel) && !t.isLeaf(sel)) kids(sel).forEach(walk)
+  // geometry after layout
   svg.setAttribute('width', String(box.clientWidth)); svg.setAttribute('height', String(box.scrollHeight))
-  const glyph = (n: number) => { const e = rowOf.get(n)!, g = e.querySelector<HTMLElement>('.tg')!; return { x: e.offsetLeft + g.offsetLeft + g.offsetWidth / 2, y: e.offsetTop + g.offsetTop + g.offsetHeight / 2, r: g.offsetHeight / 2 } }
-  for (const [n] of rowOf) {
-    const ks = kidsOf.get(n)!; if (!ks.length) continue
-    const p = glyph(n), cs = ks.map(glyph)
-    svg.appendChild(line(p.x, p.y + p.r, p.x, Math.max(...cs.map(c => c.y))))
-    for (const c of cs) svg.appendChild(line(p.x, c.y, c.x - c.r, c.y))
+  const center = (e: HTMLElement) => { const g = e.querySelector<HTMLElement>('.tg')!; return { x: e.offsetLeft + g.offsetLeft + g.offsetWidth / 2, y: e.offsetTop + g.offsetTop + g.offsetHeight / 2 } }
+  const h0 = t.nodes[sel].height || 1, xj = (h: number) => X0 + (DX - X0) * (1 - Math.sqrt(Math.max(0, h) / h0))
+  const pos = new Map<number, { x: number; y: number }>()
+  const place = (n: number): { x: number; y: number } => {
+    const r = rowOf.get(n); if (r) { const p = center(r); pos.set(n, p); return p }
+    const ks = kids(n).map(place), y = ks.reduce((s, p) => s + p.y, 0) / ks.length, p = { x: n === sel ? X0 : xj(t.nodes[n].height), y }
+    pos.set(n, p); return p
+  }
+  const line = (x1: number, y1: number, x2: number, y2: number) => svg.appendChild(svgEl('line', { x1, y1, x2, y2 }))
+  if (!atRoot) { const a = center(upRow!), b = center(selRow!); line(a.x, a.y + R, b.x, b.y - R) }
+  if (rowOf.size) {
+    if (!atRoot) { place(sel); pos.set(sel, { x: center(selRow!).x, y: center(selRow!).y }) } else place(sel)
+    const draw = (n: number) => {
+      if (rowOf.has(n)) return
+      const p = pos.get(n)!, ks = kids(n), cs = ks.map(c => pos.get(c)!)
+      if (n === sel && !atRoot) { const sp = center(selRow!); line(sp.x, sp.y + R, sp.x, Math.max(...cs.map(c => c.y))) }
+      else if (n === sel) line(p.x, Math.min(...cs.map(c => c.y)), p.x, Math.max(...cs.map(c => c.y)))
+      else line(p.x, Math.min(...cs.map(c => c.y)), p.x, Math.max(...cs.map(c => c.y)))
+      const px = n === sel && !atRoot ? center(selRow!).x : p.x
+      for (const c of cs) line(px, c.y, c.x - R, c.y)
+      if (n !== sel && n !== t.root) {   // merge handle at the junction (none on the world root)
+        const g = svgEl('g', { class: 'junction', transform: `translate(${p.x},${p.y})` })
+        g.appendChild(svgEl('circle', { r: R }))
+        const tx = svgEl('text', { y: 1 }); tx.textContent = '−'; g.appendChild(tx)
+        const tip = svgEl('title', {}); tip.textContent = 'Merge into one cluster: ' + o.name(n); g.appendChild(tip)
+        g.addEventListener('click', () => o.onMerge(n)); svg.appendChild(g)
+      }
+      ks.forEach(draw)
+    }
+    draw(sel)
   }
 }
