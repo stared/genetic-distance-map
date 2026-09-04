@@ -12,9 +12,14 @@ on Eurogenes Global25 coordinates. See `DATA_NOTES.md` for sources and conventio
   and an inverse-distance-weighted heatmap is drawn over land. Clicking on empty land builds a query
   from the nearest placed populations. The list on the left is the ranked nearest populations.
 - **Clusters**: Ward hierarchical clustering (moderns / ancients / both) cut into k clusters.
-  Colours are hierarchical: hue is divided along the tree, so nearby hues are nearby branches.
-- **Drill-down**: start at the root, the tree is split into 2–4 branches; click a branch (point or
-  legend entry) to zoom into it and split it again. Breadcrumbs go back up.
+  Land is coloured Voronoi-style by the cluster of the nearest sampled location; colours are
+  hierarchical (hue divided along the tree, so nearby hues are nearby branches). The side panel is a
+  collapsible tree down to the cut.
+- **Drill-down**: start at the root, the tree is split into 2–4 branches; click a branch (region, point
+  or tree entry) to zoom into it and split it again. Breadcrumbs go back up.
+
+Rendering: a 1024×1024 Mercator raster over a land mask; each cell holds its 6 nearest sampled
+locations (k-d tree on the sphere) with inverse-distance weights and a fade beyond 500–1500 km.
 
 URL hash state: `#sim/Polish`, `#clu/m/16`, `#drill/all/3`.
 

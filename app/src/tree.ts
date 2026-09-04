@@ -9,7 +9,7 @@ export class Tree {
   root: number
   L: number
   attach: Map<number, number>          // any pop id (in this set) -> clean leaf pop id
-  leafOfPop = new Map<number, number>() // clean pop id -> leaf node id
+  leafOfPop = new Map<number, number>()
   private memberCache = new Map<number, number[]>()
 
   constructor(t: TreeData) {
@@ -23,7 +23,7 @@ export class Tree {
     this.root = this.nodes.length - 1
     this.attach = new Map(Object.entries(t.attach).map(([k, v]) => [Number(k), v]))
   }
-  /** pop ids of the clean leaves under a node */
+  isLeaf(node: number) { return this.nodes[node].pop >= 0 }
   members(node: number): number[] {
     const hit = this.memberCache.get(node); if (hit) return hit
     const out: number[] = []; const stack = [node]
@@ -49,21 +49,18 @@ export class Tree {
     this.attach.forEach((leaf, pop) => { const c = leafCluster.get(leaf); if (c !== undefined) out.set(pop, c) })
     return out
   }
-  /** hierarchical hues: walk from root, dividing the hue circle proportionally to subtree size */
-  hierarchicalColors(roots: number[]): string[] {
-    const isRoot = new Map(roots.map((r, i) => [r, i]))
-    const colors = new Array<string>(roots.length)
+  /** hierarchical hues for the cluster roots and all their ancestors: hue circle divided proportionally to subtree size */
+  colorMap(roots: number[], top = this.root): Map<number, string> {
+    const isRoot = new Set(roots), out = new Map<number, string>()
     const rec = (node: number, a: number, b: number, depth: number) => {
-      const ci = isRoot.get(node)
-      if (ci !== undefined) { colors[ci] = hcl((a + b) / 2, 65, 55 + (depth % 3) * 8).formatHex(); return }
+      out.set(node, hcl((a + b) / 2, 62, 62).formatHex())
+      if (isRoot.has(node)) return
       const n = this.nodes[node]; if (n.pop >= 0) return
-      const gap = (b - a) * 0.08
-      const fl = this.nodes[n.left].size / n.size
-      const mid = a + (b - a - gap) * fl
+      const gap = (b - a) * 0.06, fl = this.nodes[n.left].size / n.size, mid = a + (b - a - gap) * fl
       rec(n.left, a, mid, depth + 1); rec(n.right, mid + gap, b, depth + 1)
     }
-    rec(this.root, 0, 360, 0)
-    return colors
+    rec(top, 0, 360, 0)
+    return out
   }
   ancestors(node: number): number[] { const out = []; let n = node; while (n >= 0) { out.push(n); n = this.nodes[n].parent } return out.reverse() }
 }

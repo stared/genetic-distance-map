@@ -10,51 +10,58 @@
 <div id="app">
   <aside id="panel">
     <header>
-      <h1>G25 population map</h1>
-      <nav id="modes">
+      <div class="title">G25 population map</div>
+      <nav id="modes" class="seg">
         <button data-mode="sim" class="active">Similarity</button>
         <button data-mode="clu">Clusters</button>
         <button data-mode="drill">Drill-down</button>
       </nav>
-      <div class="row">
-        <label><input type="checkbox" id="showM" checked /> modern</label>
-        <label><input type="checkbox" id="showA" checked /> ancient</label>
-        <label><input type="checkbox" id="showO" /> outliers / low_res</label>
+      <div class="toggles">
+        <label><input type="checkbox" id="showM" checked /><span class="dot m"></span>modern</label>
+        <label><input type="checkbox" id="showA" checked /><span class="dot a"></span>ancient</label>
+        <label><input type="checkbox" id="showO" />outliers &amp; low-res</label>
       </div>
     </header>
+
     <section id="mode-sim" class="mode">
       <div class="search">
-        <input id="search" type="search" placeholder="Search population (e.g. Polish, Italy_Lazio_IA)…" autocomplete="off" />
+        <input id="search" type="search" placeholder="Search a population…" autocomplete="off" spellcheck="false" />
         <ul id="suggest" hidden></ul>
       </div>
-      <p class="hint">Click a point or any place on the map. Distances are Euclidean on scaled G25, ×100 as in Vahaduo.</p>
-      <div class="row"><label>colour range 0–<span id="dmaxVal">20</span>: <input type="range" id="dmax" min="4" max="60" step="1" value="20" /></label></div>
-      <div id="query"></div>
-      <ol id="nearest"></ol>
+      <div id="query" class="query"><span class="hint">Click a point or any place on the map, or search.</span></div>
+      <div class="scale">
+        <div class="bar" id="scalebar"></div>
+        <div class="ticks"><span>0</span><span>distance ×100</span><span id="dmaxVal">20</span></div>
+        <input type="range" id="dmax" min="4" max="60" step="1" value="20" />
+      </div>
+      <div id="nearest" class="list"></div>
     </section>
+
     <section id="mode-clu" class="mode" hidden>
-      <div class="row">
-        <label>tree:
+      <div class="controls">
+        <label class="field"><span>tree</span>
           <select id="treeSet"><option value="m">moderns</option><option value="a">ancients</option><option value="all">both</option></select>
         </label>
-        <label>clusters: <span id="kVal">8</span> <input type="range" id="k" min="0" max="60" step="1" value="10" /></label>
+        <label class="field grow"><span>clusters <b id="kVal">8</b></span><input type="range" id="k" min="0" max="60" step="1" value="10" /></label>
       </div>
-      <p class="hint">Ward tree cut into k clusters. Colours are hierarchical: nearby hues = nearby branches. Click a legend entry to zoom.</p>
-      <ul id="legend"></ul>
+      <p class="hint">Ward tree cut into k clusters. Hue follows the tree, so similar hues are neighbouring branches. Expand nodes, click a name to zoom.</p>
+      <div id="clutree" class="tree"></div>
     </section>
+
     <section id="mode-drill" class="mode" hidden>
-      <div class="row">
-        <label>tree:
+      <div class="controls">
+        <label class="field"><span>tree</span>
           <select id="treeSet2"><option value="m">moderns</option><option value="a">ancients</option><option value="all">both</option></select>
         </label>
-        <label>split into: <select id="splitM"><option>2</option><option selected>3</option><option>4</option></select></label>
-        <button id="up">↑ up</button>
+        <label class="field"><span>split</span><select id="splitM"><option>2</option><option selected>3</option><option>4</option></select></label>
+        <button id="up" class="btn">↑ up</button>
       </div>
-      <p class="hint">Start at the root. Click a point (or a group below) to zoom into that branch and split it again.</p>
-      <div id="crumbs"></div>
-      <ul id="children"></ul>
+      <p class="hint">Click a branch on the map or below to zoom in and split it again.</p>
+      <div id="crumbs" class="crumbs"></div>
+      <div id="children" class="tree"></div>
     </section>
-    <footer>Data: <a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a> (no sims) on Eurogenes Global25. Locations are approximate, assigned by an LLM. </footer>
+
+    <footer><a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a> (no sims), Eurogenes Global25. Locations are approximate, assigned by an LLM.</footer>
   </aside>
   <div id="map"></div>
   <div id="tooltip" hidden></div>
