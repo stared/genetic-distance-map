@@ -20,12 +20,12 @@ never drawn). Ancient samples are available only as similarity queries through t
   (prehistoric, ancient, medieval, early modern) are searchable, and words combine ("medieval poland").
 - **Clusters**: Ward hierarchical clustering of present-day populations. The map is coloured
   Voronoi-style by the cluster of the nearest sampled location, with hierarchical hues (nearby hues are
-  nearby branches). The panel is the tree itself: every branch down to the current cut is a row, indented
-  in proportion to the square root of its Ward distance and joined to its parent by connector lines, so
-  it reads as a dendrogram. [+] splits a cluster into its two children, [−] merges a split back. Clicking
-  a row (or a region on the map) selects that branch: the map zooms to it, its clusters take the whole
-  hue circle, everything else goes grey, and the rows outside it dim the same way; clicking it again
-  returns to the world. Branches that merely repeat their parent's name are folded into it. Hovering a
+  nearby branches). The panel is the tree itself, pruned to what matters: the path down to the selected branch,
+  the selected branch (lit) and its clusters. Rows are indented in proportion to the square root of Ward
+  distance, rescaled to the selected branch, and joined by connector lines, so it reads as a dendrogram.
+  + splits a cluster into its two children, − merges a split back. Clicking a row (or a region on the
+  map) selects that branch: the map zooms to it, its clusters take the whole hue circle and everything
+  else goes grey; clicking it again returns to the world. Branches that merely repeat their parent's name are folded into it. Hovering a
   row highlights that cluster's dots, and the browser Back button undoes any step. Branches are named by
   the areas they hold most of (continents when they own them, subregions otherwise, derived from
   coordinates in `app/src/regions.ts`). It opens with the world in 8 clusters.

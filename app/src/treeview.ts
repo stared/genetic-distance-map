@@ -9,46 +9,58 @@ const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt
 const NS = 'http://www.w3.org/2000/svg'
 const line = (x1: number, y1: number, x2: number, y2: number) => { const e = document.createElementNS(NS, 'line'); e.setAttribute('x1', String(x1)); e.setAttribute('y1', String(y1)); e.setAttribute('x2', String(x2)); e.setAttribute('y2', String(y2)); return e }
 
-/** The cluster tree as rows: every branch down to the current cut is a row, indented in proportion to the
- *  square root of its Ward distance and joined to its parent by connector lines. [+] splits a cluster, [−] merges
- *  a split back, clicking a name selects that branch (the map zooms to it, its clusters get the colours, the rest
- *  is grey; rows outside it are dimmed the same way). Clicking the selected name again returns to the world. */
+/** The cluster tree, pruned to what matters: the path down to the selected branch, the selected branch (lit),
+ *  and its clusters. Rows are indented in proportion to the square root of Ward distance and joined by
+ *  connector lines. + splits a cluster, − merges it back, clicking a name selects it (again: back to world). */
 export function renderTreeList(el: HTMLElement, o: TreeListOpts) {
   const t = o.tree
   el.innerHTML = ''
   const box = document.createElement('div'); box.className = 'tlist'
   const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'links')
   box.appendChild(svg); el.appendChild(box)
-  const IND = 130, h0 = t.nodes[t.root].height || 1
-  const x = (h: number) => Math.round(IND * (1 - Math.sqrt(Math.max(0, h) / h0)))
-  const rowOf = new Map<number, HTMLElement>(), kidsOf = new Map<number, number[]>()   // visible children per visible row
-  const inFocus = (n: number) => { let m = n; while (m >= 0 && m !== o.focus) m = t.nodes[m].parent; return m === o.focus }
-  const add = (n: number, vparent: number) => {
+  const IND = 120, STEP = 14
+  // indentation: square root of Ward distance, scaled to the selected branch so its splits fill the width
+  const hTop = t.nodes[o.focus].height || 1
+  const path = o.focus === t.root ? [] : t.ancestors(o.focus).slice(1, -1).filter((n, i, a) => o.name(n) !== o.name(i === a.length - 1 ? o.focus : a[i + 1]))
+  const base = path.length * STEP
+  const x = (n: number) => base + Math.round(IND * (1 - Math.sqrt(Math.max(0, t.nodes[n].height) / hTop)))
+  const xOf = new Map<number, number>()
+  const rowOf = new Map<number, HTMLElement>(), kidsOf = new Map<number, number[]>()
+  const kids = (n: number) => { const nd = t.nodes[n]; return [nd.left, nd.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size).filter(c => o.hasMembers(c)) }
+  const row = (n: number, vparent: number, cls: string, xp = x(n)) => {
     const leaf = t.isLeaf(n), isOpen = o.open.has(n) && !leaf, cut = !isOpen
-    // an open branch that just repeats its parent's name adds nothing: its children attach to the parent directly
-    if (isOpen && vparent >= 0 && o.name(n) === o.name(vparent)) { const nd = t.nodes[n]; for (const c of [nd.left, nd.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size)) if (o.hasMembers(c)) add(c, vparent); return }
     if (vparent >= 0) kidsOf.get(vparent)!.push(n)
-    kidsOf.set(n, [])
-    const row = document.createElement('div')
-    row.className = 'trow' + (n === o.focus ? ' on' : '') + (inFocus(n) ? '' : ' out') + (cut ? ' cut' : '')
-    row.style.paddingLeft = x(t.nodes[n].height) + 'px'
-    row.innerHTML = (leaf ? '<span class="tg none"></span>' : `<span class="tg" title="${isOpen ? 'Merge back' : 'Split in two'}">${isOpen ? '−' : '+'}</span>`)
+    kidsOf.set(n, []); xOf.set(n, xp)
+    const e = document.createElement('div'); e.className = 'trow ' + cls + (cut ? ' cut' : '')
+    e.style.paddingLeft = xp + 'px'
+    e.innerHTML = (leaf ? '<span class="tg none"></span>' : `<span class="tg" title="${isOpen ? 'Merge back' : 'Split in two'}">${isOpen ? '−' : '+'}</span>`)
       + (cut ? `<span class="sw" style="background:${o.colors.get(n) ?? '#999'}"></span>` : '')
       + `<span class="name">${esc(o.name(n))}</span>`
-    if (!leaf) row.querySelector<HTMLElement>('.tg')!.onclick = e => { e.stopPropagation(); o.onToggle(n) }
-    row.onclick = () => o.onSelect(n)
-    row.onmouseenter = () => o.onHover(n); row.onmouseleave = () => o.onHover(null)
-    box.appendChild(row); rowOf.set(n, row)
-    if (isOpen) { const nd = t.nodes[n]; for (const c of [nd.left, nd.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size)) if (o.hasMembers(c)) add(c, n) }
+    if (!leaf) e.querySelector<HTMLElement>('.tg')!.onclick = ev => { ev.stopPropagation(); o.onToggle(n) }
+    e.onclick = () => o.onSelect(n)
+    e.onmouseenter = () => o.onHover(n); e.onmouseleave = () => o.onHover(null)
+    box.appendChild(e); rowOf.set(n, e)
+    return isOpen
   }
-  const r = t.nodes[t.root]; for (const c of [r.left, r.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size)) if (o.hasMembers(c)) add(c, -1)
-  // connector lines after layout: from a parent's toggle down to each child's row
+  // the subtree of n; an open branch that just repeats its parent's name is folded into it
+  const sub = (n: number, vparent: number) => {
+    if (o.open.has(n) && !t.isLeaf(n) && vparent >= 0 && o.name(n) === o.name(vparent)) { for (const c of kids(n)) sub(c, vparent); return }
+    if (row(n, vparent, '')) for (const c of kids(n)) sub(c, n)
+  }
+  if (o.focus === t.root) for (const c of kids(t.root)) sub(c, -1)
+  else {
+    // path from the top to the selected branch as a short stair, then the branch itself, lit
+    let vp = -1
+    path.forEach((n, i) => { row(n, vp, 'anc', i * STEP); vp = n })
+    if (row(o.focus, vp, 'on')) for (const c of kids(o.focus)) sub(c, o.focus)
+  }
+  // connector lines after layout: from a parent's glyph column down to each child's row
   svg.setAttribute('width', String(box.clientWidth)); svg.setAttribute('height', String(box.scrollHeight))
-  const cx = (n: number) => x(t.nodes[n].height) + 13, cy = (n: number) => { const e = rowOf.get(n)!; return e.offsetTop + e.offsetHeight / 2 }
+  const cx = (n: number) => xOf.get(n)! + 12, cy = (n: number) => { const e = rowOf.get(n)!; return e.offsetTop + e.offsetHeight / 2 }
   for (const [n, e] of rowOf) {
-    const kids = kidsOf.get(n)!; if (!kids.length) continue
-    const px = cx(n), y0 = e.offsetTop + e.offsetHeight - 2, y1 = Math.max(...kids.map(cy))
+    const ks = kidsOf.get(n)!; if (!ks.length) continue
+    const px = cx(n), y0 = e.offsetTop + e.offsetHeight - 3, y1 = Math.max(...ks.map(cy))
     svg.appendChild(line(px, y0, px, y1))
-    for (const c of kids) svg.appendChild(line(px, cy(c), x(t.nodes[c].height) + 4, cy(c)))
+    for (const c of ks) svg.appendChild(line(px, cy(c), xOf.get(c)! + 5, cy(c)))
   }
 }
