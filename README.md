@@ -32,7 +32,10 @@ nearest shown locations (k-d tree on the sphere) with inverse-distance weights a
 islands smaller than a cell are still painted. The raster is drawn with the map transform and
 clipped to the vector coastline. The app opens on a default query.
 
-URL hash state: `#sim/Polish`, `#sim/Russia_Samara_EBA_Yamnaya`, `#clu/16`, `#split`.
+Shareable URLs: the address bar always reflects the current state, e.g.
+`?q=Polish&scale=close&map=15.00,48.00,1400`, `?q=Russia_Samara_EBA_Yamnaya`, `?view=clusters&k=16`,
+`?view=split&path=3682` (`map` is centre longitude, latitude and Mercator scale; `scale` is close, regional
+or global; `path` is the list of tree nodes descended into).
 
 ## Run
 

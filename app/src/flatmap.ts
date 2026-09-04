@@ -14,6 +14,7 @@ export class FlatMap {
   state: MapState = { styles: [], rasterAlpha: 0.85 }
   onClick: (lon: number, lat: number, pop: Pop | null) => void = () => {}
   onHover: (pop: Pop | null, x: number, y: number) => void = () => {}
+  onMove: () => void = () => {}                 // called after every render (pan, zoom, animation frame)
   colors = { ocean: '#000000', land: '#17181c', border: '#2e3037', graticule: '#111216' }
   private pops: Pop[]; private land: any; private borders: any; private heat: HeatGrid
   private screen = new Float32Array(0)
@@ -55,8 +56,10 @@ export class FlatMap {
     if (2 * half <= this.h) this.ty = this.h / 2; else this.ty = Math.min(half, Math.max(this.h - half, this.ty))
   }
   setRaster(alpha: number) { this.state.rasterAlpha = alpha; this.request() }
-  request() { if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.render() }) }
+  request() { this.onMove(); if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.render() }) }
   project(lon: number, lat: number): [number, number] { const p = this.proj([lon, lat])!; return [p[0], p[1]] }
+  /** current view: centre lon/lat and scale */
+  view(): { lon: number; lat: number; k: number } { const g = geoMercator().scale(this.k).translate([this.tx, this.ty]).invert!([this.w / 2, this.h / 2])!; return { lon: ((g[0] + 540) % 360) - 180, lat: g[1], k: this.k } }
   invert(x: number, y: number): [number, number] | null { const g = this.proj.invert!([x, y]); return g && Math.abs(g[1]) <= LAT_MAX ? [((g[0] + 540) % 360) - 180, g[1]] : null }
   zoomAt(x: number, y: number, f: number) {
     const k0 = this.k; this.k = Math.max(this.minK(), Math.min(this.minK() * 200, this.k * f)); f = this.k / k0
@@ -66,6 +69,7 @@ export class FlatMap {
   flyTo(lon: number, lat: number, k: number, dur = 600) {
     k = Math.max(this.minK(), Math.min(this.minK() * 200, k))
     const p = geoMercator().scale(k).translate([0, 0])([lon, lat])!
+    if (dur <= 0) { this.anim = null; this.k = k; this.tx = this.w / 2 - p[0]; this.ty = this.h / 2 - p[1]; this.clamp(); this.request(); return }
     this.anim = { t0: performance.now(), dur, from: [this.k, this.tx, this.ty], to: [k, this.w / 2 - p[0], this.h / 2 - p[1]] }
     this.request()
   }
@@ -121,6 +125,7 @@ export class FlatMap {
       }
     }
     ctx.globalAlpha = 1
+    if (this.anim) this.onMove()
   }
   private dot(ctx: CanvasRenderingContext2D, p: Pop, x: number, y: number, r: number, color: string, alpha: number) {
     ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.beginPath()

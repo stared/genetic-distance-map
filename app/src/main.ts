@@ -42,7 +42,7 @@ async function main() {
   const meta = (p: Pop) => `<span class="loc">${PIN}${esc(p.place ?? 'no location')}</span>` + tags(p).map(t => `<span>${t}</span>`).join('')
 
   // ---------- similarity
-  let query: { name: string; meta: string; c: number[] } | null = null
+  let query: { name: string; core: string; meta: string; c: number[] } | null = null
   const d = new Float32Array(pops.length), raw = new Float32Array(pops.length)
   let d0 = 0                                   // colour scale runs from d0 (nearest shown population) to dmax
   const dminEl = $('dmin'), dmaxV = $('dmaxv'), legend = $('legend')
@@ -74,9 +74,10 @@ async function main() {
         const t = el.closest('[data-id]') as HTMLElement | null; selectPop(byId.get(t ? +t.dataset.id! : best.id)!, true) })
       list.appendChild(g)
     }
+    syncUrl()
   }
   function selectPop(p: Pop, fly: boolean) {
-    query = { name: disp(p.core), meta: meta(p), c: p.c }
+    query = { name: disp(p.core), core: p.core, meta: meta(p), c: p.c }
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
@@ -104,7 +105,7 @@ async function main() {
     clu = { roots, assign, colors }
     paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
     const opts: Parameters<typeof renderTree>[1] = { tree, root: tree.root, cutRoots: new Set(roots), colors, byId, expanded, showRoot: false, visible: id => !!visible[id], onSelect: n => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)), onToggle: () => renderTree($('clutree'), opts) }
-    renderTree($('clutree'), opts)
+    renderTree($('clutree'), opts); syncUrl()
   }
 
   // ---------- split
@@ -121,11 +122,24 @@ async function main() {
     path.forEach((n, i) => { const s = document.createElement('span'); s.textContent = i === 0 ? 'World' : nameOf(tree, n, byId, 2); s.onclick = () => { path = path.slice(0, i + 1); renderDrill(true) }; crumbs.appendChild(s) })
     renderTree($('children'), { tree, root: node, cutRoots: new Set(children), colors, byId, expanded: new Set([node]), showRoot: false, flat: true, visible: id => !!visible[id], onSelect: n => descend(n), onToggle: () => {} })
     if (zoom) fitTo(tree.members(node).map(id => byId.get(id)!))
+    syncUrl()
   }
   function descend(node: number) { if (!drill || tree.isLeaf(node)) return; path.push(node); renderDrill(true) }
 
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else if (mode === 'clu') renderClusters(); else renderDrill(false) }
+  // ---------- shareable URL: ?q=Polish&scale=regional&map=lon,lat,zoom | ?view=clusters&k=8 | ?view=split&path=…
+  const SCALE_NAME: Record<string, string> = { '0.05': 'close', '0.25': 'regional', '1': 'global' }
+  let urlTimer = 0
+  function syncUrl() {
+    const u = new URLSearchParams()
+    if (mode === 'sim') { if (query) u.set('q', query.core); if (rangeQ !== 0.25) u.set('scale', SCALE_NAME[String(rangeQ)]) }
+    else if (mode === 'clu') { u.set('view', 'clusters'); u.set('k', String(kSteps[+kEl.value])) }
+    else { u.set('view', 'split'); if (path.length > 1) u.set('path', path.slice(1).join(',')) }
+    const v = map.view(); u.set('map', `${v.lon.toFixed(2)},${v.lat.toFixed(2)},${Math.round(v.k)}`)
+    history.replaceState(null, '', '?' + u.toString().replace(/%2C/g, ','))
+  }
+  map.onMove = () => { clearTimeout(urlTimer); urlTimer = window.setTimeout(syncUrl, 250) }
   function setMode(m: Mode) {
     mode = m; legend.hidden = m !== 'sim' || !query
     document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m))
@@ -215,11 +229,21 @@ async function main() {
     }
     if (p) selectPop(p, false)
   }
-  // initial state from the URL hash, else the default query
-  const h = decodeURIComponent(location.hash.slice(1)).split('/')
-  if (h[0] === 'clu') { const ki = kSteps.indexOf(+h[1]); if (ki >= 0) kEl.value = String(ki); setMode('clu') }
-  else if (h[0] === 'split') { setMode('split'); renderDrill(true) }
-  else { const p = pops.find(p => p.core === (h[0] === 'sim' && h[1] ? h[1] : DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
+  // initial state from the URL, else the default query
+  const u = new URLSearchParams(location.search)
+  const mapParam = (u.get('map') ?? '').split(',').map(Number)
+  const hasMap = mapParam.length === 3 && mapParam.every(Number.isFinite)
+  const scaleQ = Object.entries(SCALE_NAME).find(([, n]) => n === u.get('scale'))?.[0]
+  if (scaleQ) { rangeQ = +scaleQ; rangeEl.value = scaleQ }
+  if (u.get('view') === 'clusters') { const ki = kSteps.indexOf(+(u.get('k') ?? '')); if (ki >= 0) kEl.value = String(ki); setMode('clu') }
+  else if (u.get('view') === 'split') {
+    const ids = (u.get('path') ?? '').split(',').filter(Boolean).map(Number)
+    const under = (id: number, anc: number) => { let n = id; while (n >= 0 && n !== anc) n = tree.nodes[n].parent; return n === anc }
+    path = [tree.root]; for (const id of ids) { if (tree.nodes[id] && under(id, path[path.length - 1])) path.push(id); else break }
+    setMode('split'); renderDrill(!hasMap)
+  }
+  else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
+  if (hasMap) map.flyTo(mapParam[0], mapParam[1], mapParam[2], 0)
 }
 function haversine(a: number, b: number, c: number, dd: number) {
   const r = Math.PI / 180; const h = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((dd - b) * r / 2) ** 2
