@@ -53,7 +53,7 @@ export class Tree {
   colorMap(roots: number[], top = this.root): Map<number, string> {
     const isRoot = new Set(roots), out = new Map<number, string>()
     const rec = (node: number, a: number, b: number, depth: number) => {
-      out.set(node, hcl((a + b) / 2, 62, 62).formatHex())
+      out.set(node, hcl((a + b) / 2, 78, 66).formatHex())
       if (isRoot.has(node)) return
       const n = this.nodes[node]; if (n.pop >= 0) return
       const gap = (b - a) * 0.06, fl = this.nodes[n.left].size / n.size, mid = a + (b - a - gap) * fl

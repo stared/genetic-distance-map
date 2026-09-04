@@ -1,4 +1,4 @@
-import { interpolateYlGnBu } from 'd3-scale-chromatic'
+import { interpolateTurbo } from 'd3-scale-chromatic'
 import { rgb } from 'd3-color'
 import type { Pop } from './types'
 
@@ -6,8 +6,8 @@ export const W = 1024, H = 1024
 const SCALE = W / (2 * Math.PI)
 export const LAT_MAX = (2 * Math.atan(Math.exp((H / 2) / SCALE)) - Math.PI / 2) * 180 / Math.PI // ≈85.05°
 const K = 6, FADE_KM = 500, MAX_KM = 1500
-/** colour ramp: t=0 close (deep blue) … t=1 far (pale) */
-const ramp = (t: number) => interpolateYlGnBu(1 - (0.08 + 0.92 * t))
+/** colour ramp: t=0 close (red) … t=1 far (blue), fully saturated, no grey */
+export const ramp = (t: number) => interpolateTurbo(0.93 - 0.85 * t)
 
 /** lon/lat -> grid pixel (plain Mercator) */
 export function project(lon: number, lat: number): [number, number] {
@@ -76,8 +76,10 @@ export class HeatGrid {
       for (const dx of [-W, 0, W]) { pts.forEach(([x, y], i) => i ? ctx.lineTo(x + dx, y) : ctx.moveTo(x + dx, y)); ctx.closePath() }
     }
     ctx.fill('nonzero')
-    const land = ctx.getImageData(0, 0, W, H).data
+    const land0 = ctx.getImageData(0, 0, W, H).data
     ctx.clearRect(0, 0, W, H)
+    const land = new Uint8Array(W * H)
+    for (let i = 0; i < W * H; i++) if (land0[i * 4] >= 128) { const r = (i / W) | 0, c = i % W; for (let dy = -2; dy <= 2; dy++) { const rr = r + dy; if (rr < 0 || rr >= H) continue; for (let dx = -2; dx <= 2; dx++) land[rr * W + ((c + dx + W) % W)] = 1 } }
     // unique locations
     const locOf = new Map<string, number>(); const lat: number[] = [], lon: number[] = []
     for (const p of pops) {
@@ -97,7 +99,7 @@ export class HeatGrid {
     for (let r = 0; r < H; r++) {
       const cl = 2 * Math.atan(Math.exp((H / 2 - (r + 0.5)) / SCALE)) - Math.PI / 2, cosl = Math.cos(cl), sinl = Math.sin(cl)
       for (let cix = 0; cix < W; cix++) {
-        const cell = r * W + cix; if (land[cell * 4] < 128) continue
+        const cell = r * W + cix; if (!land[cell]) continue
         const clon = (-180 + (cix + 0.5) * 360 / W) * Math.PI / 180
         const m = kd.query(cosl * Math.cos(clon), cosl * Math.sin(clon), sinl, K, outI, outD)
         const near = chordToKm(outD[0]); if (near > MAX_KM) continue
@@ -107,7 +109,7 @@ export class HeatGrid {
     }
   }
   /** similarity: per-pop distances (×100), averaged over visible pops at each location */
-  renderHeat(d: Float32Array, visible: Uint8Array, dmax: number, alpha = 0.92) {
+  renderHeat(d: Float32Array, visible: Uint8Array, dmax: number, alpha = 1) {
     this.locPops.forEach((ids, li) => { let s = 0, c = 0; for (const id of ids) if (visible[id]) { s += d[id]; c++ } this.locOk[li] = c ? 1 : 0; this.locVal[li] = c ? s / c : 0 })
     const px = this.img.data
     for (let cell = 0; cell < W * H; cell++) {
@@ -119,10 +121,9 @@ export class HeatGrid {
       const li = Math.round(Math.sqrt(Math.min(1, (s / sw) / dmax)) * 255) * 3
       px[o] = this.lut[li]; px[o + 1] = this.lut[li + 1]; px[o + 2] = this.lut[li + 2]; px[o + 3] = f * alpha
     }
-    this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }
   /** categorical (Voronoi-style): each cell takes the category of its nearest location that has one */
-  renderCategories(locCat: Int32Array, palette: Uint8ClampedArray, alpha = 0.7) {
+  renderCategories(locCat: Int32Array, palette: Uint8ClampedArray, alpha = 1) {
     const px = this.img.data
     for (let cell = 0; cell < W * H; cell++) {
       const o = cell * 4, f = this.fade[cell]
@@ -132,8 +133,7 @@ export class HeatGrid {
       if (cat < 0) { px[o + 3] = 0; continue }
       px[o] = palette[cat * 3]; px[o + 1] = palette[cat * 3 + 1]; px[o + 2] = palette[cat * 3 + 2]; px[o + 3] = f * alpha
     }
-    this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }
-  clear() { this.canvas.getContext('2d')!.clearRect(0, 0, W, H) }
+  clear() { this.img.data.fill(0) }
   static colorFor(dd: number, dmax: number): string { return ramp(Math.sqrt(Math.min(1, dd / dmax))) }
 }
