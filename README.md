@@ -18,10 +18,10 @@ on Eurogenes Global25 coordinates. See `DATA_NOTES.md` for sources and conventio
 - **Drill-down**: start at the root, the tree is split into 2–4 branches; click a branch (region, point
   or tree entry) to zoom into it and split it again. Breadcrumbs go back up.
 
-Rendering: a custom canvas orthographic globe (drag to rotate, wheel to zoom, no map library).
-Values live on a 1024×1024 Mercator raster; each cell holds its 6 nearest sampled locations (k-d tree on
-the sphere) with inverse-distance weights and a fade beyond 500–1500 km. The raster is reprojected per
-screen pixel every frame (half resolution while dragging) and clipped to the vector coastline.
+Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan, wheel to zoom, no map
+library). Values live on a 1024×1024 Mercator raster; each cell holds its 6 nearest sampled locations
+(k-d tree on the sphere) with inverse-distance weights and a fade beyond 500–1500 km. The raster is drawn
+directly with the map transform and clipped to the vector coastline. The app opens on a default query.
 
 URL hash state: `#sim/Polish`, `#clu/m/16`, `#drill/all/3`.
 
@@ -46,4 +46,4 @@ genetic nearest neighbour is > 4,000 km away, for geocoding review).
 
 - `data/` raw sheets and geocoding (`geo/GEOCODING_INSTRUCTIONS.md`, `geo/chunks/*.csv`)
 - `analysis/` exploration scripts and the data build script
-- `app/` Vite + TypeScript app (d3-geo globe on canvas)
+- `app/` Vite + TypeScript app (d3-geo Mercator map on canvas)

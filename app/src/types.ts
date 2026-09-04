@@ -3,6 +3,7 @@ export interface Pop {
   o: boolean; low: boolean; cont: boolean; profile: string; first: string;
   lat: number | null; lon: number | null; dlat: number | null; dlon: number | null;
   prec: string | null; place: string | null; c: number[];
+  region?: string;   // country-level name derived from place (set at load)
 }
 export interface TreeData { leaves: number[]; merges: [number, number, number, number][]; attach: Record<string, number> }
 export type TreeSet = 'm' | 'a' | 'all'

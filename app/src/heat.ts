@@ -121,6 +121,7 @@ export class HeatGrid {
       const li = Math.round(Math.sqrt(Math.min(1, (s / sw) / dmax)) * 255) * 3
       px[o] = this.lut[li]; px[o + 1] = this.lut[li + 1]; px[o + 2] = this.lut[li + 2]; px[o + 3] = f * alpha
     }
+    this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }
   /** categorical (Voronoi-style): each cell takes the category of its nearest location that has one */
   renderCategories(locCat: Int32Array, palette: Uint8ClampedArray, alpha = 1) {
@@ -133,7 +134,8 @@ export class HeatGrid {
       if (cat < 0) { px[o + 3] = 0; continue }
       px[o] = palette[cat * 3]; px[o + 1] = palette[cat * 3 + 1]; px[o + 2] = palette[cat * 3 + 2]; px[o + 3] = f * alpha
     }
+    this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }
-  clear() { this.img.data.fill(0) }
+  clear() { this.img.data.fill(0); this.canvas.getContext('2d')!.clearRect(0, 0, W, H) }
   static colorFor(dd: number, dmax: number): string { return ramp(Math.sqrt(Math.min(1, dd / dmax))) }
 }
