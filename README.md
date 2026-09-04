@@ -23,7 +23,7 @@ library). Values live on a 1024×1024 Mercator raster; each cell holds its 6 nea
 (k-d tree on the sphere) with inverse-distance weights and a fade beyond 500–1500 km. The raster is drawn
 directly with the map transform and clipped to the vector coastline. The app opens on a default query.
 
-URL hash state: `#sim/Polish`, `#clu/m/16`, `#split/all`.
+URL hash state: `#sim/Polish`, `#clu/m/16`, `#split/a`.
 
 ## Run
 

@@ -8,7 +8,7 @@
 body { margin: 0; background: var(--bg); }
 #app { display: flex; height: 100vh; }
 #panel { width: 380px; min-width: 320px; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--bg); overflow: hidden; }
-#panel header { border-bottom: 1px solid var(--line); display: flex; flex-direction: column; }
+#panel header { display: flex; flex-direction: column; }
 #map { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
 #map canvas { display: block; cursor: grab; }
 .mode[hidden] { display: none; }
@@ -17,12 +17,14 @@ footer { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--mut
 footer a { color: var(--fg); }
 a { color: var(--accent); text-decoration: none; }
 
-.row { display: flex; gap: 2px; padding: 0 12px; }
-.row:first-child { padding-top: 10px; }
-.row:last-child { padding-bottom: 10px; }
-.row button { border: 0; background: transparent; padding: 7px 10px; border-radius: 6px; font: inherit; color: var(--muted); cursor: pointer; }
-.row button:hover { color: var(--fg); }
-.row button.active { color: var(--fg); background: #1e1e22; }
+.tabs { display: flex; }
+.tabs button { flex: 1; border: 0; background: #131316; padding: 13px 0; font: inherit; font-weight: 500; color: var(--muted); cursor: pointer; }
+.tabs button:hover { color: var(--fg); }
+.tabs button.active { background: var(--fg); color: #000; }
+.period { display: flex; padding: 12px 16px 0; gap: 6px; }
+.period button { flex: 1; border: 1px solid var(--line); background: transparent; padding: 6px 0; border-radius: 6px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.period button:hover { color: var(--fg); }
+.period button.active { border-color: var(--fg); color: var(--fg); }
 
 .search { position: relative; }
 #search { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font: inherit; outline: none; background: var(--bg); color: var(--fg); }

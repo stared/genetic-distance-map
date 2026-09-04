@@ -30,9 +30,9 @@ async function main() {
 
   // ---------- shared state
   let mode: Mode = 'sim'
-  let period: TreeSet = 'm'
+  let period: 'm' | 'a' = 'm'
   const visible = new Uint8Array(pops.length)
-  const isVisible = (p: Pop) => (period === 'all' || p.kind === period) && !(p.o || p.low || p.cont)
+  const isVisible = (p: Pop) => p.kind === period && !(p.o || p.low || p.cont)
   const refreshVisible = () => pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
   const kindName = (p: Pop) => p.kind === 'm' ? 'modern' : 'ancient'
@@ -74,7 +74,7 @@ async function main() {
   const nearestCache = new Map<string, Int32Array>()
   function nearestFor(set: TreeSet) {
     let g = nearestCache.get(set)
-    if (!g) { const inSet = (p: Pop) => set === 'all' || p.kind === set; g = heat.nearestGrid(li => heat.locPops[li].some(id => inSet(byId.get(id)!))); nearestCache.set(set, g) }
+    if (!g) { const inSet = (p: Pop) => p.kind === set; g = heat.nearestGrid(li => heat.locPops[li].some(id => inSet(byId.get(id)!))); nearestCache.set(set, g) }
     return g
   }
   function paintCategories(set: TreeSet, assign: Map<number, number>, colors: string[], inScope: (p: Pop) => boolean) {
@@ -123,7 +123,7 @@ async function main() {
 
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else if (mode === 'clu') renderClusters(); else renderDrill(false) }
-  function setPeriod(p: TreeSet) {
+  function setPeriod(p: 'm' | 'a') {
     period = p; path = []
     document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.classList.toggle('active', b.dataset.period === p))
     if (mode === 'split') renderDrill(true); else render()
@@ -135,7 +135,7 @@ async function main() {
     render()
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
-  document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.onclick = () => setPeriod(b.dataset.period as TreeSet))
+  document.querySelectorAll<HTMLButtonElement>('#period button').forEach(b => b.onclick = () => setPeriod(b.dataset.period as 'm' | 'a'))
   dmaxEl.onchange = dmaxEl.oninput = () => { if (mode === 'sim') renderSim() }
   kEl.oninput = renderClusters
   $('reset').onclick = () => { path = []; renderDrill(true) }
@@ -177,7 +177,7 @@ async function main() {
   // initial state from the URL hash, else the default query
   refreshVisible()
   const h = decodeURIComponent(location.hash.slice(1)).split('/')
-  const per = (['m', 'a', 'all'] as TreeSet[]).includes(h[1] as TreeSet) ? h[1] as TreeSet : 'm'
+  const per: 'm' | 'a' = h[1] === 'a' ? 'a' : 'm'
   if (h[0] === 'clu') { period = per; const ki = kSteps.indexOf(+h[2]); if (ki >= 0) kEl.value = String(ki); setPeriod(per); setMode('clu') }
   else if (h[0] === 'split') { period = per; setPeriod(per); setMode('split'); renderDrill(true) }
   else { const p = pops.find(p => p.core === (h[0] === 'sim' && h[1] ? h[1] : DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
