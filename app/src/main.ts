@@ -26,14 +26,15 @@ async function main() {
   const R_M = 3.2, R_A = 2.6
   const setPoints = (color: (p: Pop) => string | null, alpha: (p: Pop) => number) => {
     map.state.styles = pops.map(p => { const c = color(p); return c ? { color: c, alpha: alpha(p), r: p.kind === 'm' ? R_M : R_A } as PointStyle : null }); map.request() }
-  const setSelection = (pt: [number, number] | null) => { map.state.selection = pt; map.request() }
+  const setSelection = (pt: [number, number] | null, color = '#fff') => { map.state.selection = pt; map.state.selectionColor = color; map.request() }
   const fitTo = (mem: Pop[]) => map.fitTo(mem.filter(p => p.lat != null).map(p => [p.lon!, p.lat!]))
 
   // ---------- shared state
   let mode: Mode = 'sim'
-  const showM = $<HTMLInputElement>('showM'), showA = $<HTMLInputElement>('showA'), showO = $<HTMLInputElement>('showO')
+  const chips = { m: $<HTMLButtonElement>('showM'), a: $<HTMLButtonElement>('showA'), o: $<HTMLButtonElement>('showO') }
+  const on = (b: HTMLButtonElement) => b.classList.contains('on')
   const visible = new Uint8Array(pops.length)
-  const isVisible = (p: Pop) => (p.kind === 'm' ? showM.checked : showA.checked) && (showO.checked || !(p.o || p.low || p.cont))
+  const isVisible = (p: Pop) => (p.kind === 'm' ? on(chips.m) : on(chips.a)) && (on(chips.o) || !(p.o || p.low || p.cont))
   const refreshVisible = () => pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
   const kindName = (p: Pop) => p.kind === 'm' ? 'modern' : 'ancient'
@@ -52,7 +53,7 @@ async function main() {
     for (const p of pops) d[p.id] = 100 * dist(query.c, p.c)
     heat.renderHeat(d, visible, dmax); map.setRaster(0.7)
     setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], dmax) : null, () => 1)
-    setSelection(query.pt)
+    setSelection(query.pt, HeatGrid.colorFor(0, dmax))
     $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="sub">${query.sub}</div>`
     const top = pops.filter(p => visible[p.id]).sort((a, b) => d[a.id] - d[b.id]).slice(0, 80)
     const groups = new Map<string, Pop[]>(); top.forEach(p => { const g = groups.get(p.first); g ? g.push(p) : groups.set(p.first, [p]) })
@@ -138,7 +139,7 @@ async function main() {
     render()
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
-  ;[showM, showA, showO].forEach(el => el.onchange = render)
+  Object.values(chips).forEach(b => b.onclick = () => { b.classList.toggle('on'); b.setAttribute('aria-pressed', String(on(b))); render() })
   dmaxEl.onchange = dmaxEl.oninput = () => { if (mode === 'sim') renderSim() }
   treeSet.onchange = renderClusters; kEl.oninput = renderClusters
   treeSet2.onchange = () => { path = []; renderDrill(true) }; splitM.onchange = () => renderDrill(false)

@@ -3,7 +3,7 @@ import type { Pop } from './types'
 import { HeatGrid, LAT_MAX } from './heat'
 
 export interface PointStyle { color: string; alpha: number; r: number }
-export interface MapState { styles: (PointStyle | null)[]; selection: [number, number] | null; rasterAlpha: number }
+export interface MapState { styles: (PointStyle | null)[]; selection: [number, number] | null; selectionColor: string; rasterAlpha: number }
 
 /** Flat Web-Mercator map on a 2D canvas: pan by drag, wheel zoom to cursor. */
 export class FlatMap {
@@ -11,7 +11,7 @@ export class FlatMap {
   w = 0; h = 0; dpr = 1
   k = 100; tx = 0; ty = 0                       // mercator scale and translate (css px)
   proj: GeoProjection = geoMercator()
-  state: MapState = { styles: [], selection: null, rasterAlpha: 0.85 }
+  state: MapState = { styles: [], selection: null, selectionColor: '#fff', rasterAlpha: 0.85 }
   onClick: (lon: number, lat: number, pop: Pop | null) => void = () => {}
   onHover: (pop: Pop | null, x: number, y: number) => void = () => {}
   colors = { ocean: '#000000', land: '#17181c', border: '#2e3037', graticule: '#111216' }
@@ -49,14 +49,15 @@ export class FlatMap {
   private clamp() {
     this.k = Math.max(this.minK(), Math.min(this.minK() * 200, this.k))
     const half = Math.PI * this.k
-    // keep the world covering the viewport horizontally (or centred if narrower) and vertically
-    if (2 * half <= this.w) this.tx = this.w / 2; else this.tx = Math.min(half, Math.max(this.w - half, this.tx))
+    // wrap horizontally (continuous panning), clamp vertically to the poles
+    const ww = 2 * half, c = this.w / 2
+    this.tx = c + (((this.tx - c + half) % ww + ww) % ww) - half     // tx normalised to [c-half, c+half)
     if (2 * half <= this.h) this.ty = this.h / 2; else this.ty = Math.min(half, Math.max(this.h - half, this.ty))
   }
   setRaster(alpha: number) { this.state.rasterAlpha = alpha; this.request() }
   request() { if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.render() }) }
   project(lon: number, lat: number): [number, number] { const p = this.proj([lon, lat])!; return [p[0], p[1]] }
-  invert(x: number, y: number): [number, number] | null { const g = this.proj.invert!([x, y]); return g && Math.abs(g[1]) <= LAT_MAX ? [g[0], g[1]] : null }
+  invert(x: number, y: number): [number, number] | null { const g = this.proj.invert!([x, y]); return g && Math.abs(g[1]) <= LAT_MAX ? [((g[0] + 540) % 360) - 180, g[1]] : null }
   zoomAt(x: number, y: number, f: number) {
     const k0 = this.k; this.k = Math.max(this.minK(), Math.min(this.minK() * 200, this.k * f)); f = this.k / k0
     this.tx = x - (x - this.tx) * f; this.ty = y - (y - this.ty) * f; this.clamp(); this.request()
@@ -93,31 +94,42 @@ export class FlatMap {
       if (t >= 1) this.anim = null; else this.request()
       this.clamp()
     }
-    this.proj = geoMercator().scale(this.k).translate([this.tx, this.ty]).precision(0.3)
-    const ctx = this.ctx, w = this.w, h = this.h, path = geoPath(this.proj, ctx)
+    const ctx = this.ctx, w = this.w, h = this.h, half = Math.PI * this.k, ww = 2 * half
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.fillStyle = this.colors.ocean; ctx.fillRect(0, 0, w, h)
-    ctx.beginPath(); path(this.land); ctx.fillStyle = this.colors.land; ctx.fill()
-    if (this.state.rasterAlpha > 0) {
-      ctx.save(); ctx.clip(); ctx.globalAlpha = this.state.rasterAlpha; ctx.imageSmoothingEnabled = true
-      const half = Math.PI * this.k   // raster spans ±180° × ±LAT_MAX, i.e. a square of side 2πk in mercator px
-      ctx.drawImage(this.heat.canvas, this.tx - half, this.ty - half, 2 * half, 2 * half)
-      ctx.restore(); ctx.globalAlpha = 1
-    }
-    ctx.beginPath(); path(this.borders); ctx.strokeStyle = this.colors.border; ctx.lineWidth = 0.8; ctx.stroke()
     this.screen.fill(NaN)
-    const st = this.state.styles
-    for (const p of this.pops) {
-      const s = st[p.id]; if (!s || p.dlat == null) continue
-      const q = this.project(p.dlon!, p.dlat)
-      if (q[0] < -10 || q[0] > w + 10 || q[1] < -10 || q[1] > h + 10) continue
-      this.screen[p.id * 2] = q[0]; this.screen[p.id * 2 + 1] = q[1]
-      ctx.globalAlpha = s.alpha; ctx.fillStyle = s.color; ctx.beginPath()
-      if (p.kind === 'm') ctx.arc(q[0], q[1], s.r, 0, 2 * Math.PI)
-      else { const r = s.r * 1.2; ctx.moveTo(q[0], q[1] - r); ctx.lineTo(q[0] + r, q[1]); ctx.lineTo(q[0], q[1] + r); ctx.lineTo(q[0] - r, q[1]); ctx.closePath() }
-      ctx.fill()
+    // draw every world copy that intersects the viewport (continuous horizontal panning)
+    const offsets: number[] = []
+    for (let i = -2; i <= 2; i++) { const x0 = this.tx + i * ww - half; if (x0 < w && x0 + ww > 0) offsets.push(i * ww) }
+    this.proj = geoMercator().scale(this.k).translate([this.tx, this.ty]).precision(0.3)
+    for (const off of offsets) {
+      const proj = geoMercator().scale(this.k).translate([this.tx + off, this.ty]).precision(0.3), path = geoPath(proj, ctx)
+      ctx.beginPath(); path(this.land); ctx.fillStyle = this.colors.land; ctx.fill()
+      if (this.state.rasterAlpha > 0) {
+        ctx.save(); ctx.clip(); ctx.globalAlpha = this.state.rasterAlpha; ctx.imageSmoothingEnabled = true
+        ctx.drawImage(this.heat.canvas, this.tx + off - half, this.ty - half, ww, ww)
+        ctx.restore(); ctx.globalAlpha = 1
+      }
+      ctx.beginPath(); path(this.borders); ctx.strokeStyle = this.colors.border; ctx.lineWidth = 0.8; ctx.stroke()
+      const st = this.state.styles
+      for (const p of this.pops) {
+        const s = st[p.id]; if (!s || p.dlat == null) continue
+        const q = proj([p.dlon!, p.dlat])!
+        if (q[0] < -10 || q[0] > w + 10 || q[1] < -10 || q[1] > h + 10) continue
+        this.screen[p.id * 2] = q[0]; this.screen[p.id * 2 + 1] = q[1]
+        this.dot(ctx, p, q[0], q[1], s.r, s.color, s.alpha)
+      }
+      if (this.state.selection) {
+        const q = proj(this.state.selection)!
+        if (q[0] > -20 && q[0] < w + 20) { ctx.globalAlpha = 1; ctx.fillStyle = this.colors.ocean; ctx.beginPath(); ctx.arc(q[0], q[1], 9, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = this.state.selectionColor; ctx.beginPath(); ctx.arc(q[0], q[1], 6.5, 0, 2 * Math.PI); ctx.fill() }
+      }
     }
     ctx.globalAlpha = 1
-    if (this.state.selection) { const q = this.project(...this.state.selection); ctx.beginPath(); ctx.arc(q[0], q[1], 9, 0, 2 * Math.PI); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke() }
+  }
+  private dot(ctx: CanvasRenderingContext2D, p: Pop, x: number, y: number, r: number, color: string, alpha: number) {
+    ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.beginPath()
+    if (p.kind === 'm') ctx.arc(x, y, r, 0, 2 * Math.PI)
+    else { const rr = r * 1.2; ctx.moveTo(x, y - rr); ctx.lineTo(x + rr, y); ctx.lineTo(x, y + rr); ctx.lineTo(x - rr, y); ctx.closePath() }
+    ctx.fill()
   }
 }

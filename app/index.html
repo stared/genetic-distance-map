@@ -10,15 +10,15 @@
 <div id="app">
   <aside id="panel">
     <header>
-      <nav id="modes" class="seg">
+      <nav id="modes" class="tabs">
         <button data-mode="sim" class="active">Similarity</button>
         <button data-mode="clu">Clusters</button>
         <button data-mode="drill">Drill-down</button>
       </nav>
-      <div class="toggles">
-        <label><input type="checkbox" id="showM" checked /><span class="glyph m"></span>modern</label>
-        <label><input type="checkbox" id="showA" checked /><span class="glyph a"></span>ancient</label>
-        <label><input type="checkbox" id="showO" />outliers &amp; low-res</label>
+      <div class="chips">
+        <button id="showM" class="chip on" aria-pressed="true"><span class="glyph m"></span>modern</button>
+        <button id="showA" class="chip on" aria-pressed="true"><span class="glyph a"></span>ancient</button>
+        <button id="showO" class="chip" aria-pressed="false">outliers</button>
       </div>
     </header>
 
@@ -57,7 +57,7 @@
       <div id="children" class="tree"></div>
     </section>
 
-    <footer><a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a> · Global25 · Euclidean distance on scaled coordinates, ×100 · locations approximate</footer>
+    <footer>Data from <a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a><br>Data viz by <a href="https://p.migdal.pl" target="_blank">Piotr Migdał</a> 2026</footer>
   </aside>
   <div id="map"></div>
   <div id="tooltip" hidden></div>
