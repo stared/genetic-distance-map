@@ -21,17 +21,17 @@ never drawn). Ancient samples are available only as similarity queries through t
 - **Clusters**: Ward hierarchical clustering of present-day populations. The map is coloured
   Voronoi-style by the cluster of the nearest sampled location, with hierarchical hues (nearby hues are
   nearby branches). The panel is a dendrogram of the branch in focus down to the current cut, with
-  branch lengths proportional to Ward distance. The slider cuts the whole tree into k clusters; clicking
+  branch lengths on a square-root scale of Ward distance. It opens with the world in 8 clusters; clicking
   a cluster row or a map region splits it into its two children, focuses on it (its children take the
-  whole hue circle, everything else goes grey) and zooms the map; clicking a junction focuses there,
-  clicking the focused junction merges it back; breadcrumbs and Reset lead back up. Branches are named
-  by the areas they hold most of (continents when they own them, subregions otherwise, derived from
-  coordinates in `app/src/regions.ts`).
+  whole hue circle, everything else goes grey) and zooms the map; hovering a row highlights that
+  cluster's dots; clicking a junction zooms to that branch, clicking the focused junction merges it back;
+  breadcrumbs lead back up. Branches are named by the areas they hold most of (continents when they own
+  them, subregions otherwise, derived from coordinates in `app/src/regions.ts`).
 
 Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
 wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each cell holds its 6
 nearest shown locations (k-d tree on the sphere) with inverse-distance weights and a fade between
-1500 and 2500 km from the nearest sample. Coastlines are stroked into the raster land mask so
+800 and 1600 km from the nearest sample. Coastlines are stroked into the raster land mask so
 islands smaller than a cell are still painted. The raster is drawn with the map transform and
 clipped to the vector coastline. The app opens on a default query.
 

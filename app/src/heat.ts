@@ -5,7 +5,7 @@ import type { Pop } from './types'
 export const W = 1024, H = 1024
 const SCALE = W / (2 * Math.PI)
 export const LAT_MAX = (2 * Math.atan(Math.exp((H / 2) / SCALE)) - Math.PI / 2) * 180 / Math.PI // ≈85.05°
-const K = 6, FADE_KM = 1500, MAX_KM = 2500
+const K = 6, FADE_KM = 800, MAX_KM = 1600
 /** colour ramp: t=0 close (red) … t=1 far (blue), fully saturated, no grey */
 export const ramp = (t: number) => interpolateTurbo(0.93 - 0.85 * t)
 

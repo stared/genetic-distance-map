@@ -94,9 +94,6 @@ async function main() {
   }
 
   // ---------- clusters: the map shows the current cut of the tree; open nodes are split into their two children
-  const kEl = $<HTMLInputElement>('k')
-  const kSteps = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 400, 500, 600, 800, 1000]
-  kEl.max = String(kSteps.length - 1)
   const K_DEFAULT = 8
   const open = new Set<number>()
   const cutTo = (k: number) => { open.clear(); open.add(tree.root); for (const r of tree.split(tree.root, k)) for (const a of tree.ancestors(r)) if (a !== r) open.add(a) }
@@ -143,14 +140,18 @@ async function main() {
     const roots = cutLeaves(), assign = tree.assign(roots), colors = tree.colorMap(roots.filter(r => under(r, focus)), focus)
     for (const r of roots) if (!colors.has(r)) colors.set(r, GREY)
     clu = { roots, assign, colors }
-    $('kVal').textContent = String(roots.length); kEl.value = String(Math.max(0, kSteps.filter(k => k <= roots.length).length - 1))
     paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
     renderDendro($('clutree'), { tree, open, focus, colors, name: nameOfNode, hasMembers: n => tree.members(n).some(id => visible[id]),
-      onLeaf: focusOn, onJunction: n => n === focus ? mergeBack(n) : focusTo(n), onCrumb: focusTo })
+      onLeaf: focusOn, onJunction: n => n === focus ? mergeBack(n) : focusTo(n), onCrumb: focusTo, onHover: highlight })
     syncUrl()
   }
-  kEl.oninput = () => { cutTo(kSteps[+kEl.value]); focus = tree.root; renderClusters() }
-  $('creset').onclick = () => { cutTo(K_DEFAULT); focus = tree.root; renderClusters(); map.flyTo(20, 30, 0) }
+  // hovering a row: that cluster's dots stand out, the others fade
+  function highlight(node: number | null) {
+    if (!clu) return
+    const { roots, assign, colors } = clu, hl = node === null ? -1 : roots.indexOf(node)
+    setPoints(p => { if (!visible[p.id]) return null; const c = assign.get(p.id); return c === undefined ? null : colors.get(roots[c])! },
+      p => hl < 0 ? 1 : assign.get(p.id) === hl ? 1 : 0.25)
+  }
 
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else renderClusters() }
