@@ -4,7 +4,7 @@ import { Tree } from './tree'
 import { HeatGrid, ramp } from './heat'
 import { loadWorld } from './world'
 import { FlatMap, type PointStyle } from './flatmap'
-import { renderDendro } from './treeview'
+import { renderTreeList } from './treeview'
 import { regionOf } from './regions'
 
 type Mode = 'sim' | 'clu'
@@ -131,18 +131,19 @@ async function main() {
   const GREY = '#52525b'
   const under = (id: number, anc: number) => { let n = id; while (n >= 0 && n !== anc) n = tree.nodes[n].parent; return n === anc }
   cutTo(K_DEFAULT)
-  const zoomTo = (n: number) => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!))
-  const select = (n: number) => { focus = n; renderClusters(); zoomTo(n) }            // zoom in; this branch gets the colours, the rest grey
+  const zoomTo = (n: number) => n === tree.root ? map.flyTo(20, 25, 0) : fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!))
+  const select = (n: number) => { focus = n === focus ? tree.root : n; renderClusters(); zoomTo(focus) }   // zoom in; this branch gets the colours, the rest grey; again = back to world
   const split = (n: number) => { if (!tree.isLeaf(n)) open.add(n); renderClusters() }   // one cluster becomes its two children, view unchanged
   const merge = (n: number) => { open.delete(n); if (under(focus, n)) focus = n; renderClusters() }
+  const toggle = (n: number) => open.has(n) ? merge(n) : split(n)
   function renderClusters() {
     if (!under(focus, tree.root)) focus = tree.root
     const roots = cutLeaves(), assign = tree.assign(roots), colors = tree.colorMap(roots.filter(r => under(r, focus)), focus)
     for (const r of roots) if (!colors.has(r)) colors.set(r, GREY)
     clu = { roots, assign, colors }
     paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
-    renderDendro($('clutree'), { tree, open, focus, colors, name: nameOfNode, hasMembers: n => tree.members(n).some(id => visible[id]),
-      onSelect: select, onSplit: split, onMerge: merge, onHover: highlight })
+    renderTreeList($('clutree'), { tree, open, focus, colors, name: nameOfNode, hasMembers: n => tree.members(n).some(id => visible[id]),
+      onSelect: select, onToggle: toggle, onHover: highlight })
     syncUrl()
   }
   // hovering a row: that cluster's dots stand out, the others fade
