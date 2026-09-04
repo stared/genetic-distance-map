@@ -51,6 +51,8 @@ export class HeatGrid {
   idx = new Int32Array(W * H * K).fill(-1)
   wgt = new Float32Array(W * H * K)
   fade = new Uint8Array(W * H)          // 0 = no data / ocean, 255 = fully inside sampled area
+  land = new Uint8Array(W * H)
+  private locXYZ!: { X: Float64Array; Y: Float64Array; Z: Float64Array }
   locPops: number[][] = []              // location -> pop ids
   private locVal: Float32Array
   private locOk: Uint8Array
@@ -78,7 +80,7 @@ export class HeatGrid {
     ctx.fill('nonzero')
     const land0 = ctx.getImageData(0, 0, W, H).data
     ctx.clearRect(0, 0, W, H)
-    const land = new Uint8Array(W * H)
+    const land = this.land
     for (let i = 0; i < W * H; i++) if (land0[i * 4] >= 128) { const r = (i / W) | 0, c = i % W; for (let dy = -2; dy <= 2; dy++) { const rr = r + dy; if (rr < 0 || rr >= H) continue; for (let dx = -2; dx <= 2; dx++) land[rr * W + ((c + dx + W) % W)] = 1 } }
     // unique locations
     const locOf = new Map<string, number>(); const lat: number[] = [], lon: number[] = []
@@ -93,6 +95,7 @@ export class HeatGrid {
     this.locVal = new Float32Array(n); this.locOk = new Uint8Array(n)
     const X = new Float64Array(n), Y = new Float64Array(n), Z = new Float64Array(n)
     for (let i = 0; i < n; i++) { X[i] = Math.cos(lat[i]) * Math.cos(lon[i]); Y[i] = Math.cos(lat[i]) * Math.sin(lon[i]); Z[i] = Math.sin(lat[i]) }
+    this.locXYZ = { X, Y, Z }
     const kd = new KD(X, Y, Z)
     const outI = new Int32Array(K), outD = new Float64Array(K)
     const chordToKm = (c2: number) => 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(c2) / 2))
@@ -107,6 +110,25 @@ export class HeatGrid {
         for (let j = 0; j < m; j++) { const km = chordToKm(outD[j]); this.idx[cell * K + j] = outI[j]; this.wgt[cell * K + j] = 1 / ((km + 40) ** 2) }
       }
     }
+  }
+  /** nearest location (restricted to locations passing `keep`) for every land cell within maxKm; -1 otherwise */
+  nearestGrid(keep: (li: number) => boolean, maxKm = 2500): Int32Array {
+    const { X, Y, Z } = this.locXYZ
+    const sel: number[] = []; for (let li = 0; li < X.length; li++) if (keep(li)) sel.push(li)
+    const kd = new KD(Float64Array.from(sel, i => X[i]), Float64Array.from(sel, i => Y[i]), Float64Array.from(sel, i => Z[i]))
+    const out = new Int32Array(W * H).fill(-1), oi = new Int32Array(1), od = new Float64Array(1)
+    const maxC2 = (2 * Math.sin(maxKm / 6371 / 2)) ** 2
+    if (!sel.length) return out
+    for (let r = 0; r < H; r++) {
+      const cl = 2 * Math.atan(Math.exp((H / 2 - (r + 0.5)) / SCALE)) - Math.PI / 2, cosl = Math.cos(cl), sinl = Math.sin(cl)
+      for (let cix = 0; cix < W; cix++) {
+        const cell = r * W + cix; if (!this.land[cell]) continue
+        const clon = (-180 + (cix + 0.5) * 360 / W) * Math.PI / 180
+        kd.query(cosl * Math.cos(clon), cosl * Math.sin(clon), sinl, 1, oi, od)
+        if (od[0] <= maxC2) out[cell] = sel[oi[0]]
+      }
+    }
+    return out
   }
   /** similarity: per-pop distances (×100), averaged over visible pops at each location */
   renderHeat(d: Float32Array, visible: Uint8Array, dmax: number, alpha = 1) {
@@ -124,15 +146,14 @@ export class HeatGrid {
     this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }
   /** categorical (Voronoi-style): each cell takes the category of its nearest location that has one */
-  renderCategories(locCat: Int32Array, palette: Uint8ClampedArray, alpha = 1) {
+  renderCategories(locCat: Int32Array, palette: Uint8ClampedArray, nearest: Int32Array) {
     const px = this.img.data
     for (let cell = 0; cell < W * H; cell++) {
-      const o = cell * 4, f = this.fade[cell]
-      if (!f) { px[o + 3] = 0; continue }
-      let cat = -1
-      for (let j = 0; j < K; j++) { const li = this.idx[cell * K + j]; if (li < 0) break; if (locCat[li] >= 0) { cat = locCat[li]; break } }
+      const o = cell * 4
+      let li = nearest[cell], cat = li >= 0 ? locCat[li] : -1
+      if (cat < 0) for (let j = 0; j < K; j++) { li = this.idx[cell * K + j]; if (li < 0) break; if (locCat[li] >= 0) { cat = locCat[li]; break } }
       if (cat < 0) { px[o + 3] = 0; continue }
-      px[o] = palette[cat * 3]; px[o + 1] = palette[cat * 3 + 1]; px[o + 2] = palette[cat * 3 + 2]; px[o + 3] = f * alpha
+      px[o] = palette[cat * 3]; px[o + 1] = palette[cat * 3 + 1]; px[o + 2] = palette[cat * 3 + 2]; px[o + 3] = 255
     }
     this.canvas.getContext('2d')!.putImageData(this.img, 0, 0)
   }

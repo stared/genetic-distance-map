@@ -3,7 +3,7 @@ import type { Pop } from './types'
 import { HeatGrid, LAT_MAX } from './heat'
 
 export interface PointStyle { color: string; alpha: number; r: number }
-export interface MapState { styles: (PointStyle | null)[]; selection: [number, number] | null; selectionColor: string; rasterAlpha: number }
+export interface MapState { styles: (PointStyle | null)[]; rasterAlpha: number }
 
 /** Flat Web-Mercator map on a 2D canvas: pan by drag, wheel zoom to cursor. */
 export class FlatMap {
@@ -11,7 +11,7 @@ export class FlatMap {
   w = 0; h = 0; dpr = 1
   k = 100; tx = 0; ty = 0                       // mercator scale and translate (css px)
   proj: GeoProjection = geoMercator()
-  state: MapState = { styles: [], selection: null, selectionColor: '#fff', rasterAlpha: 0.85 }
+  state: MapState = { styles: [], rasterAlpha: 0.85 }
   onClick: (lon: number, lat: number, pop: Pop | null) => void = () => {}
   onHover: (pop: Pop | null, x: number, y: number) => void = () => {}
   colors = { ocean: '#000000', land: '#17181c', border: '#2e3037', graticule: '#111216' }
@@ -118,10 +118,6 @@ export class FlatMap {
         if (q[0] < -10 || q[0] > w + 10 || q[1] < -10 || q[1] > h + 10) continue
         this.screen[p.id * 2] = q[0]; this.screen[p.id * 2 + 1] = q[1]
         this.dot(ctx, p, q[0], q[1], s.r, s.color, s.alpha)
-      }
-      if (this.state.selection) {
-        const q = proj(this.state.selection)!
-        if (q[0] > -20 && q[0] < w + 20) { ctx.globalAlpha = 1; ctx.fillStyle = this.colors.ocean; ctx.beginPath(); ctx.arc(q[0], q[1], 9, 0, 2 * Math.PI); ctx.fill(); ctx.fillStyle = this.state.selectionColor; ctx.beginPath(); ctx.arc(q[0], q[1], 6.5, 0, 2 * Math.PI); ctx.fill() }
       }
     }
     ctx.globalAlpha = 1

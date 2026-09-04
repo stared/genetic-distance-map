@@ -26,7 +26,6 @@ async function main() {
   const R_M = 3.2, R_A = 2.6
   const setPoints = (color: (p: Pop) => string | null, alpha: (p: Pop) => number) => {
     map.state.styles = pops.map(p => { const c = color(p); return c ? { color: c, alpha: alpha(p), r: p.kind === 'm' ? R_M : R_A } as PointStyle : null }); map.request() }
-  const setSelection = (pt: [number, number] | null, color = '#fff') => { map.state.selection = pt; map.state.selectionColor = color; map.request() }
   const fitTo = (mem: Pop[]) => map.fitTo(mem.filter(p => p.lat != null).map(p => [p.lon!, p.lat!]))
 
   // ---------- shared state
@@ -42,18 +41,17 @@ async function main() {
   const describe = (p: Pop) => `${kindName(p)} · n ${p.n}${p.profile ? ' · ' + esc(p.profile) : ''}${flags(p) ? ' · ' + flags(p) : ''}<br>${esc(p.place ?? 'no location')}`
 
   // ---------- similarity
-  let query: { name: string; sub: string; c: number[]; pt: [number, number] | null } | null = null
+  let query: { name: string; sub: string; c: number[] } | null = null
   const d = new Float32Array(pops.length)
   const dmaxEl = $<HTMLInputElement>('dmax')
   $('ramp').style.background = `linear-gradient(to right, ${[0, .1, .2, .35, .5, .7, 1].map(t => ramp(Math.sqrt(t))).join(',')})`
   function renderSim() {
     refreshVisible()
-    if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; setSelection(null); return }
+    if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; return }
     const dmax = Math.max(1, +dmaxEl.value || 20)
     for (const p of pops) d[p.id] = 100 * dist(query.c, p.c)
     heat.renderHeat(d, visible, dmax); map.setRaster(0.7)
     setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], dmax) : null, () => 1)
-    setSelection(query.pt, HeatGrid.colorFor(0, dmax))
     $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="sub">${query.sub}</div>`
     const top = pops.filter(p => visible[p.id]).sort((a, b) => d[a.id] - d[b.id]).slice(0, 80)
     const groups = new Map<string, Pop[]>(); top.forEach(p => { const g = groups.get(p.first); g ? g.push(p) : groups.set(p.first, [p]) })
@@ -69,27 +67,22 @@ async function main() {
     }
   }
   function selectPop(p: Pop, fly: boolean) {
-    query = { name: disp(p.core), sub: describe(p), c: p.c, pt: p.dlat != null ? [p.dlon!, p.dlat] : null }
+    query = { name: disp(p.core), sub: describe(p), c: p.c }
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
-  function selectPlace(lng: number, lat: number) {
-    refreshVisible()
-    const near = pops.filter(p => p.lat != null && visible[p.id]).map(p => ({ p, km: haversine(lat, lng, p.lat!, p.lon!) })).filter(x => x.km < 500).sort((a, b) => a.km - b.km).slice(0, 6)
-    if (!near.length) return
-    const c = new Array(25).fill(0); let sw = 0
-    for (const { p, km } of near) { const w = 1 / ((km + 30) ** 2); sw += w; for (let i = 0; i < 25; i++) c[i] += w * p.c[i] }
-    for (let i = 0; i < 25; i++) c[i] /= sw
-    query = { name: `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lng).toFixed(1)}°${lng >= 0 ? 'E' : 'W'}`, sub: 'blend of ' + near.map(x => `${esc(disp(x.p.core))} <span class="n">${Math.round(x.km)} km</span>`).join(', '), c, pt: [lng, lat] }
-    renderSim()
-  }
-
   // ---------- categorical colouring shared by clusters / drill-down
-  function paintCategories(assign: Map<number, number>, colors: string[], inScope: (p: Pop) => boolean) {
+  const nearestCache = new Map<string, Int32Array>()
+  function nearestFor(set: TreeSet) {
+    let g = nearestCache.get(set)
+    if (!g) { const inSet = (p: Pop) => set === 'all' || p.kind === set; g = heat.nearestGrid(li => heat.locPops[li].some(id => inSet(byId.get(id)!))); nearestCache.set(set, g) }
+    return g
+  }
+  function paintCategories(set: TreeSet, assign: Map<number, number>, colors: string[], inScope: (p: Pop) => boolean) {
     const locCat = new Int32Array(heat.locPops.length).fill(-1)
     heat.locPops.forEach((ids, li) => { const cnt = new Map<number, number>(); for (const id of ids) { if (!visible[id]) continue; const c = assign.get(id); if (c !== undefined) cnt.set(c, (cnt.get(c) ?? 0) + 1) } let best = -1, bc = 0; cnt.forEach((v, k) => { if (v > bc) { bc = v; best = k } }); locCat[li] = best })
     const pal = new Uint8ClampedArray(colors.length * 3); colors.forEach((c, i) => { const r = rgb(c); pal[i * 3] = r.r; pal[i * 3 + 1] = r.g; pal[i * 3 + 2] = r.b })
-    heat.renderCategories(locCat, pal); map.setRaster(0.75); setSelection(null)
+    heat.renderCategories(locCat, pal, nearestFor(set)); map.setRaster(0.75)
     setPoints(p => { if (!visible[p.id]) return null; const c = assign.get(p.id); return c !== undefined ? colors[c] : inScope(p) ? '#71717a' : null }, p => assign.has(p.id) ? 1 : 0.5)
   }
 
@@ -105,7 +98,7 @@ async function main() {
     const roots = tree.split(tree.root, k), assign = tree.assign(roots), colors = tree.colorMap(roots)
     if (!clu || clu.tree !== tree) { expanded.clear(); expanded.add(tree.root); const r = tree.nodes[tree.root]; expanded.add(r.left); expanded.add(r.right) }
     clu = { tree, roots, assign, colors }
-    paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
+    paintCategories(treeSet.value as TreeSet, assign, roots.map(r => colors.get(r)!), () => false)
     const opts: Parameters<typeof renderTree>[1] = { tree, root: tree.root, cutRoots: new Set(roots), colors, byId, expanded, showRoot: false, visible: id => !!visible[id], onSelect: n => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)), onToggle: () => renderTree($('clutree'), opts) }
     renderTree($('clutree'), opts)
   }
@@ -122,7 +115,7 @@ async function main() {
     const children = tree.split(node, +splitM.value), assign = tree.assign(children), colors = tree.colorMap(children, node)
     drill = { tree, children, assign }
     const scope = tree.assign([node])
-    paintCategories(assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
+    paintCategories(treeSet2.value as TreeSet, assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
     const crumbs = $('crumbs'); crumbs.innerHTML = ''
     path.forEach((n, i) => { const s = document.createElement('span'); s.textContent = i === 0 ? 'All' : nameOf(tree, n, byId, 2); s.onclick = () => { path = path.slice(0, i + 1); renderDrill(true) }; crumbs.appendChild(s) })
     renderTree($('children'), { tree, root: node, cutRoots: new Set(children), colors, byId, expanded: new Set([node]), showRoot: false, flat: true, visible: id => !!visible[id], onSelect: n => descend(n), onToggle: () => {} })
@@ -178,7 +171,6 @@ async function main() {
       if (c !== undefined) descend(drill.children[c]); return
     }
     if (p) selectPop(p, false)
-    else if (mode === 'sim') selectPlace(lng, lat)
   }
   // initial state from the URL hash, else the default query
   refreshVisible()
