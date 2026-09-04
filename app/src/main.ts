@@ -132,17 +132,17 @@ async function main() {
   const under = (id: number, anc: number) => { let n = id; while (n >= 0 && n !== anc) n = tree.nodes[n].parent; return n === anc }
   cutTo(K_DEFAULT)
   const zoomTo = (n: number) => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!))
-  const focusOn = (n: number) => { if (!tree.isLeaf(n)) { open.add(n); focus = n } renderClusters(); zoomTo(n) }
-  const focusTo = (n: number) => { focus = n; renderClusters(); zoomTo(n) }
-  const mergeBack = (n: number) => { open.delete(n); focus = tree.nodes[n].parent >= 0 ? tree.nodes[n].parent : tree.root; renderClusters(); zoomTo(focus) }
+  const select = (n: number) => { focus = n; renderClusters(); zoomTo(n) }            // zoom in; this branch gets the colours, the rest grey
+  const split = (n: number) => { if (!tree.isLeaf(n)) open.add(n); renderClusters() }   // one cluster becomes its two children, view unchanged
+  const merge = (n: number) => { open.delete(n); if (under(focus, n)) focus = n; renderClusters() }
   function renderClusters() {
-    if (!under(focus, tree.root) || !open.has(focus)) focus = tree.root
+    if (!under(focus, tree.root)) focus = tree.root
     const roots = cutLeaves(), assign = tree.assign(roots), colors = tree.colorMap(roots.filter(r => under(r, focus)), focus)
     for (const r of roots) if (!colors.has(r)) colors.set(r, GREY)
     clu = { roots, assign, colors }
     paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
     renderDendro($('clutree'), { tree, open, focus, colors, name: nameOfNode, hasMembers: n => tree.members(n).some(id => visible[id]),
-      onLeaf: focusOn, onJunction: n => n === focus ? mergeBack(n) : focusTo(n), onCrumb: focusTo, onHover: highlight })
+      onSelect: select, onSplit: split, onMerge: merge, onHover: highlight })
     syncUrl()
   }
   // hovering a row: that cluster's dots stand out, the others fade
@@ -252,7 +252,7 @@ async function main() {
         const near = pops.filter(q => q.lat != null && visible[q.id] && clu!.assign.has(q.id)).map(q => ({ q, km: haversine(lat, lng, q.lat!, q.lon!) })).sort((a, b) => a.km - b.km)[0]
         if (near && near.km < 800) c = clu.assign.get(near.q.id)
       }
-      if (c !== undefined) focusOn(clu.roots[c]); return
+      if (c !== undefined) { const n = clu.roots[c]; if (n === focus) split(n); else select(n) } return
     }
     if (p) selectPop(p, false)
   }
@@ -267,7 +267,7 @@ async function main() {
     if (u.get('view') === 'clusters') {
       const ids = (u.get('open') ?? '').split(',').filter(Boolean).map(Number).filter(n => tree.nodes[n] && !tree.isLeaf(n))
       if (ids.length) { open.clear(); open.add(tree.root); ids.forEach(n => open.add(n)) } else cutTo(K_DEFAULT)
-      const f = Number(u.get('focus')); focus = tree.nodes[f] ? f : tree.root
+      const f = u.has('focus') ? Number(u.get('focus')) : -1; focus = tree.nodes[f] ? f : tree.root
       setMode('clu')
     }
     else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, first ? 0 : 600) }

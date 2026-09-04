@@ -76,24 +76,20 @@ a { color: var(--accent); text-decoration: none; }
 .grp .more { font: inherit; color: var(--faint); background: none; border: 0; padding: 0; cursor: pointer; }
 .grp .more:hover { color: var(--fg); }
 
-.crumbs { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.crumbs span { cursor: pointer; }
-.crumbs span:hover { color: var(--fg); }
-.crumbs span::after { content: " › "; color: var(--faint); }
-.crumbs span:last-child { color: var(--fg); cursor: default; }
-.crumbs span:last-child::after { content: ""; }
+.up { color: var(--muted); cursor: pointer; }
+.up:hover { color: var(--fg); }
+.head { font-weight: 600; font-size: 15px; margin-top: 4px; }
 .dendro { display: flex; align-items: flex-start; margin-top: 10px; }
 .dendro .lines { flex: none; }
 .dendro .rows { flex: 1; min-width: 0; position: relative; }
-.dendro .row { display: flex; align-items: center; gap: 8px; padding: 6px 6px; border-radius: 5px; cursor: pointer; line-height: 1.3; }
-.dendro .row:hover { background: var(--hover); }
-.dendro .row.single { cursor: default; }
-.dendro .row.single:hover { background: none; }
-.dendro .row .name { flex: 1; }
+.dendro .row { display: flex; align-items: center; gap: 8px; padding: 6px 6px; line-height: 1.3; }
+.dendro .row .name { flex: 1; cursor: pointer; }
+.dendro .row .name:hover { color: var(--accent); }
+.dendro .row .sw.act { cursor: pointer; }
+.dendro .row .sw.act:hover { box-shadow: 0 0 0 2px var(--fg); }
 .lines .edge { stroke: var(--muted); stroke-width: 1.5; }
-.lines .stub { stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 2 3; }
-.lines .junction { cursor: pointer; }
-.lines .junction:hover { stroke: var(--fg); stroke-width: 2; }
-.lines .junction.focus { stroke: var(--fg); stroke-width: 1.5; }
+.lines .stub { stroke: var(--line); stroke-width: 1.5; }
+.lines .junction { fill: var(--bg); stroke: var(--muted); stroke-width: 1.5; cursor: pointer; }
+.lines .junction:hover { stroke: var(--fg); fill: var(--fg); }
 #tooltip { position: absolute; pointer-events: none; z-index: 10; background: #000; border: 1px solid #3f3f46; color: var(--fg); padding: 6px 9px; border-radius: 6px; font-size: 12px; max-width: 320px; }
 #tooltip .sub { color: var(--muted); }
