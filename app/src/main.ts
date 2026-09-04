@@ -116,7 +116,7 @@ async function main() {
       const cn = regionCounts(node), parent = tree.nodes[node].parent, cp = parent >= 0 ? regionCounts(parent) : cn
       const sum = (c: Map<string, number>, rs: string[]) => rs.reduce((t, r) => t + (c.get(r) ?? 0), 0)
       const cand: [string, number][] = [], used = new Set<string>()
-      for (const [cont, rs] of Object.entries(CONTINENTS)) { const n = sum(cn, rs), np = sum(cp, rs); if (n >= 0.1 * mem.length && n / np >= 0.5) { cand.push([cont, n]); rs.forEach(r => used.add(r)) } }
+      for (const [cont, rs] of Object.entries(CONTINENTS)) { const n = sum(cn, rs), np = sum(cp, rs); if (n >= 0.1 * mem.length && n / np >= 0.9) { cand.push([cont, n]); rs.forEach(r => used.add(r)) } }
       for (const [r, c] of cn) if (!used.has(r) && r !== 'other' && r !== 'unplaced' && c / (cp.get(r) ?? c) >= 0.5) cand.push([r, c])
       cand.sort((a, b) => b[1] - a[1])
       const names: string[] = []; let covered = 0
@@ -157,13 +157,17 @@ async function main() {
   function render() { if (mode === 'sim') renderSim(); else renderClusters() }
   // ---------- shareable URL: ?q=Polish&scale=regional&map=lon,lat,zoom | ?view=clusters&open=…
   const SCALE_NAME: Record<string, string> = { '0.05': 'close', '0.25': 'regional', '1': 'global' }
-  let urlTimer = 0
+  let urlTimer = 0, lastState = '', applying = false
   function syncUrl() {
     const u = new URLSearchParams()
     if (mode === 'sim') { if (query) u.set('q', query.core); if (rangeQ !== 0.25) u.set('scale', SCALE_NAME[String(rangeQ)]) }
     else { u.set('view', 'clusters'); u.set('open', [...open].filter(n => n !== tree.root).join(',')); if (focus !== tree.root) u.set('focus', String(focus)) }
+    const state = u.toString()
     const v = map.view(); u.set('map', `${v.lon.toFixed(2)},${v.lat.toFixed(2)},${Math.round(v.k)}`)
-    history.replaceState(null, '', '?' + u.toString().replace(/%2C/g, ','))
+    const url = '?' + u.toString().replace(/%2C/g, ',')
+    // a change of query, scale, split or focus is a history entry (Back undoes it); a map move only updates the entry
+    if (state !== lastState && lastState && !applying) history.pushState(null, '', url); else history.replaceState(null, '', url)
+    lastState = state
   }
   map.onMove = () => { clearTimeout(urlTimer); urlTimer = window.setTimeout(syncUrl, 250) }
   function setMode(m: Mode) {
@@ -252,20 +256,26 @@ async function main() {
     }
     if (p) selectPop(p, false)
   }
-  // initial state from the URL, else the default query
-  const u = new URLSearchParams(location.search)
-  const mapParam = (u.get('map') ?? '').split(',').map(Number)
-  const hasMap = mapParam.length === 3 && mapParam.every(Number.isFinite)
-  const scaleQ = Object.entries(SCALE_NAME).find(([, n]) => n === u.get('scale'))?.[0]
-  if (scaleQ) { rangeQ = +scaleQ; rangeEl.value = scaleQ }
-  if (u.get('view') === 'clusters') {
-    const ids = (u.get('open') ?? '').split(',').filter(Boolean).map(Number).filter(n => tree.nodes[n] && !tree.isLeaf(n))
-    if (ids.length) { open.clear(); open.add(tree.root); ids.forEach(n => open.add(n)) }
-    const f = Number(u.get('focus')); if (tree.nodes[f]) focus = f
-    setMode('clu')
+  // state from the URL (on load and on Back/Forward), else the default query
+  function applyUrl(first: boolean) {
+    const u = new URLSearchParams(location.search)
+    const mapParam = (u.get('map') ?? '').split(',').map(Number)
+    const hasMap = mapParam.length === 3 && mapParam.every(Number.isFinite)
+    const scaleQ = Object.entries(SCALE_NAME).find(([, n]) => n === u.get('scale'))?.[0] ?? '0.25'
+    rangeQ = +scaleQ; rangeEl.value = scaleQ
+    applying = true
+    if (u.get('view') === 'clusters') {
+      const ids = (u.get('open') ?? '').split(',').filter(Boolean).map(Number).filter(n => tree.nodes[n] && !tree.isLeaf(n))
+      if (ids.length) { open.clear(); open.add(tree.root); ids.forEach(n => open.add(n)) } else cutTo(K_DEFAULT)
+      const f = Number(u.get('focus')); focus = tree.nodes[f] ? f : tree.root
+      setMode('clu')
+    }
+    else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, first ? 0 : 600) }
+    if (hasMap) map.flyTo(mapParam[0], mapParam[1], mapParam[2], first ? 0 : 600)
+    applying = false
   }
-  else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
-  if (hasMap) map.flyTo(mapParam[0], mapParam[1], mapParam[2], 0)
+  applyUrl(true)
+  window.addEventListener('popstate', () => applyUrl(false))
 }
 function haversine(a: number, b: number, c: number, dd: number) {
   const r = Math.PI / 180; const h = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((dd - b) * r / 2) ** 2

@@ -16,11 +16,12 @@ export function renderDendro(el: HTMLElement, o: DendroOpts) {
   el.innerHTML = ''
   // breadcrumbs: root … focus
   const crumbs = document.createElement('div'); crumbs.className = 'crumbs'
+  // World › parent › current: the intermediate binary steps are noise the user never chose
   const anc = t.ancestors(o.focus), label = (n: number) => n === t.root ? 'World' : o.name(n)
-  anc.forEach((n, i) => {
-    if (i < anc.length - 1 && label(n) === label(anc[i + 1])) return   // skip a step that keeps the same name
+  const shown = anc.length <= 3 ? anc : [anc[0], anc[anc.length - 2], anc[anc.length - 1]]
+  shown.forEach((n, i) => {
     const s = document.createElement('span'); s.textContent = label(n)
-    if (i < anc.length - 1) s.onclick = () => o.onCrumb(n)
+    if (i < shown.length - 1) s.onclick = () => o.onCrumb(n)
     crumbs.appendChild(s)
   })
   el.appendChild(crumbs)
@@ -34,7 +35,7 @@ export function renderDendro(el: HTMLElement, o: DendroOpts) {
   const collect = (n: number) => {
     if (o.open.has(n) && !t.isLeaf(n)) { const nd = t.nodes[n]; for (const c of [nd.left, nd.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size)) if (o.hasMembers(c)) collect(c); return }
     leaves.push(n)
-    const row = document.createElement('div'); row.className = 'row' + (t.isLeaf(n) ? ' single' : '')
+    const row = document.createElement('div'); row.className = 'row' + (t.isLeaf(n) ? ' single' : ''); if (!t.isLeaf(n)) row.title = 'Split in two and zoom'
     row.innerHTML = `<span class="sw" style="background:${o.colors.get(n) ?? '#999'}"></span><span class="name">${esc(o.name(n))}</span>`
     if (!t.isLeaf(n)) row.onclick = () => o.onLeaf(n)
     row.onmouseenter = () => o.onHover(n); row.onmouseleave = () => o.onHover(null)

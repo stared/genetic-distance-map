@@ -25,7 +25,8 @@ never drawn). Ancient samples are available only as similarity queries through t
   a cluster row or a map region splits it into its two children, focuses on it (its children take the
   whole hue circle, everything else goes grey) and zooms the map; hovering a row highlights that
   cluster's dots; clicking a junction zooms to that branch, clicking the focused junction merges it back;
-  breadcrumbs lead back up. Branches are named by the areas they hold most of (continents when they own
+  breadcrumbs (World › parent › current) lead back up, and the browser Back button undoes a split, a
+  focus change or a query change. Branches are named by the areas they hold most of (continents when they own
   them, subregions otherwise, derived from coordinates in `app/src/regions.ts`).
 
 Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
