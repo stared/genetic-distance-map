@@ -44,7 +44,11 @@
       <div class="lt">Distance to <b id="lname"></b></div>
       <div class="ramp" id="ramp"></div>
       <div class="lx"><span id="dmin">0</span><span id="dmaxv">20</span></div>
-      <input type="range" id="dmax" min="2" max="60" step="1" value="20" />
+      <div id="range" class="seg small">
+        <button data-q="0.05">Close</button>
+        <button data-q="0.25" class="active">Regional</button>
+        <button data-q="0.6">Global</button>
+      </div>
     </div>
   </div>
   <div id="tooltip" hidden></div>

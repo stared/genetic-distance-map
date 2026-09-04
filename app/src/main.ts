@@ -40,20 +40,19 @@ async function main() {
   const meta = (p: Pop) => `<span class="loc">${PIN}${esc(p.place ?? 'no location')}</span>` + tags(p).map(t => `<span>${t}</span>`).join('')
 
   // ---------- similarity
-  let query: { name: string; meta: string; c: number[]; fresh: boolean } | null = null
+  let query: { name: string; meta: string; c: number[] } | null = null
   const d = new Float32Array(pops.length), raw = new Float32Array(pops.length)
   let d0 = 0                                   // colour scale runs from d0 (nearest shown population) to dmax
-  const dmaxEl = $<HTMLInputElement>('dmax'), dminEl = $('dmin'), dmaxV = $('dmaxv'), legend = $('legend')
+  const dminEl = $('dmin'), dmaxV = $('dmaxv'), legend = $('legend')
+  let rangeQ = 0.25                            // upper end of the colour scale: this quantile of distances to the query
   $('ramp').style.background = `linear-gradient(to right, ${[0, .1, .2, .35, .5, .7, 1].map(t => ramp(Math.sqrt(t))).join(',')})`
   function renderSim() {
     if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; legend.hidden = true; return }
     for (const p of pops) raw[p.id] = 100 * dist(query.c, p.c)
     const sorted = pops.filter(p => visible[p.id]).sort((a, b) => raw[a.id] - raw[b.id])
-    d0 = Math.floor(raw[sorted[0].id])
-    dmaxEl.min = String(d0 + 2); dmaxEl.max = String(Math.max(60, d0 + 40))
-    if (query.fresh) { query.fresh = false; dmaxEl.value = String(Math.min(+dmaxEl.max, Math.max(d0 + 5, Math.round(raw[sorted[Math.floor(sorted.length / 4)].id])))) }
-    const dmax = Math.max(d0 + 1, +dmaxEl.value || 20), span = dmax - d0
-    dminEl.textContent = String(d0); dmaxV.textContent = String(dmax); $('lname').textContent = query.name; legend.hidden = false
+    d0 = raw[sorted[0].id]                    // the nearest shown population is always the red end
+    const dmax = Math.max(d0 + 3, Math.round(raw[sorted[Math.floor(rangeQ * (sorted.length - 1))].id])), span = dmax - d0
+    dminEl.textContent = Number.isInteger(d0) ? String(d0) : d0.toFixed(1); dmaxV.textContent = String(dmax); $('lname').textContent = query.name; legend.hidden = false
     for (const p of pops) d[p.id] = Math.max(0, raw[p.id] - d0)
     heat.renderHeat(field, d, visible, span); map.setRaster(0.7)
     setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], span) : null, () => 1)
@@ -71,7 +70,7 @@ async function main() {
     }
   }
   function selectPop(p: Pop, fly: boolean) {
-    query = { name: disp(p.core), meta: meta(p), c: p.c, fresh: true }
+    query = { name: disp(p.core), meta: meta(p), c: p.c }
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
@@ -128,7 +127,8 @@ async function main() {
     render()
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
-  dmaxEl.onchange = dmaxEl.oninput = () => { if (mode === 'sim') renderSim() }
+  document.querySelectorAll<HTMLButtonElement>('#range button').forEach(b => b.onclick = () => {
+    rangeQ = +b.dataset.q!; document.querySelectorAll<HTMLButtonElement>('#range button').forEach(x => x.classList.toggle('active', x === b)); renderSim() })
   kEl.oninput = renderClusters
   $('reset').onclick = () => { path = []; renderDrill(true) }
 
