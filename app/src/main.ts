@@ -63,7 +63,8 @@ async function main() {
     for (const [first, mem] of groups) {
       const best = mem[0]
       const g = document.createElement('div'); g.className = 'grp'
-      const subs = mem.filter(p => subOf(p)).map(p => `<span data-id="${p.id}" title="${esc(p.label)}">${esc(subOf(p))} <i>${raw[p.id].toFixed(2)}</i></span>`).join('')
+      const all = mem.filter(p => subOf(p)), shown = all.length > 8 ? all.slice(0, 6) : all   // cap long groups; never hide just one or two
+      const subs = shown.map(p => `<span data-id="${p.id}" title="${esc(p.label)}">${esc(subOf(p))} <i>${raw[p.id].toFixed(2)}</i></span>`).join('') + (all.length > shown.length ? `<span class="n">+${all.length - shown.length} more</span>` : '')
       g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], span)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${raw[best.id].toFixed(2)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
       g.addEventListener('click', e => { const t = (e.target as HTMLElement).closest('[data-id]') as HTMLElement | null; selectPop(byId.get(t ? +t.dataset.id! : best.id)!, true) })
       list.appendChild(g)
