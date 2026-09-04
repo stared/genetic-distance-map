@@ -84,8 +84,9 @@ a { color: var(--accent); text-decoration: none; }
 .trow:hover .name { color: var(--accent); }
 .trow.anc .name { color: var(--muted); }
 .trow.on .name { font-weight: 600; font-size: 14px; }
-.trow .tg { flex: none; width: 14px; text-align: center; color: var(--muted); font-size: 15px; line-height: 14px; background: var(--bg); }
-.trow .tg:hover { color: var(--fg); }
+.trow .tg { flex: none; width: 16px; height: 16px; border: 1px solid var(--muted); border-radius: 50%; text-align: center; color: var(--muted); font-size: 13px; line-height: 14px; background: var(--bg); }
+.trow .tg:hover { color: var(--fg); border-color: var(--fg); }
+.trow .tg.none { border: 0; }
 .trow .sw { flex: none; }
 
 #tooltip { position: absolute; pointer-events: none; z-index: 10; background: #000; border: 1px solid #3f3f46; color: var(--fg); padding: 6px 9px; border-radius: 6px; font-size: 12px; max-width: 320px; }

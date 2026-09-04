@@ -54,13 +54,13 @@ export function renderTreeList(el: HTMLElement, o: TreeListOpts) {
     path.forEach((n, i) => { row(n, vp, 'anc', i * STEP); vp = n })
     if (row(o.focus, vp, 'on')) for (const c of kids(o.focus)) sub(c, o.focus)
   }
-  // connector lines after layout: from a parent's glyph column down to each child's row
+  // connector lines after layout, attached to the circles: down from the parent's circle, into each child's circle
   svg.setAttribute('width', String(box.clientWidth)); svg.setAttribute('height', String(box.scrollHeight))
-  const cx = (n: number) => xOf.get(n)! + 12, cy = (n: number) => { const e = rowOf.get(n)!; return e.offsetTop + e.offsetHeight / 2 }
-  for (const [n, e] of rowOf) {
+  const glyph = (n: number) => { const e = rowOf.get(n)!, g = e.querySelector<HTMLElement>('.tg')!; return { x: e.offsetLeft + g.offsetLeft + g.offsetWidth / 2, y: e.offsetTop + g.offsetTop + g.offsetHeight / 2, r: g.offsetHeight / 2 } }
+  for (const [n] of rowOf) {
     const ks = kidsOf.get(n)!; if (!ks.length) continue
-    const px = cx(n), y0 = e.offsetTop + e.offsetHeight - 3, y1 = Math.max(...ks.map(cy))
-    svg.appendChild(line(px, y0, px, y1))
-    for (const c of ks) svg.appendChild(line(px, cy(c), xOf.get(c)! + 5, cy(c)))
+    const p = glyph(n), cs = ks.map(glyph)
+    svg.appendChild(line(p.x, p.y + p.r, p.x, Math.max(...cs.map(c => c.y))))
+    for (const c of cs) svg.appendChild(line(p.x, c.y, c.x - c.r, c.y))
   }
 }
