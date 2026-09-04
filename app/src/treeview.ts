@@ -8,7 +8,7 @@ export interface TreeViewOpts {
 const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
 const NS = 'http://www.w3.org/2000/svg'
 const svgEl = (tag: string, attrs: Record<string, string | number>) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v)); return e }
-const X0 = 8, DX = 96, R = 8   // selected node's circle x, cluster column x, circle radius
+const X0 = 6, DX = 96, R = 6   // selected node's circle x, cluster column x, circle radius
 
 /** Two rows, then a dendrogram.  Row 1 (muted): the branch one level up, click to go there.  Row 2 (bold): the
  *  selected branch.  Below it its clusters, one aligned row each with ⊕ (split), swatch and name; junctions between

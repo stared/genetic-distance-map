@@ -89,13 +89,13 @@ a { color: var(--accent); text-decoration: none; }
 .trow.anc .name { color: var(--muted); }
 .trow.on .name { font-weight: 600; font-size: 14px; }
 /* split / merge handles: a solid disc with a dark, centred cross or bar */
-.trow .tg { flex: none; position: relative; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); }
+.trow .tg { flex: none; position: relative; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); }
 .trow .tg:hover { background: var(--fg); }
-.trow .tg::before, .trow .tg.plus::after { content: ""; position: absolute; left: 4px; top: 7px; width: 8px; height: 2px; background: var(--bg); }
-.trow .tg.plus::after { left: 7px; top: 4px; width: 2px; height: 8px; }
+.trow .tg::before, .trow .tg.plus::after { content: ""; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: var(--bg); }
+.trow .tg.plus::after { left: 5px; top: 2px; width: 2px; height: 8px; }
 .trow .tg.none { background: none; }
 .trow .tg.none::before { display: none; }
-.trow .tg.dot { background: radial-gradient(circle, var(--muted) 0 3px, transparent 3.5px); }
+.trow .tg.dot { background: radial-gradient(circle, var(--muted) 0 2.5px, transparent 3px); }
 .trow .tg.dot::before { display: none; }
 .trow .sw { flex: none; }
 
