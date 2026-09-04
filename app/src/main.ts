@@ -176,7 +176,11 @@ async function main() {
     document.querySelectorAll<HTMLElement>('.mode').forEach(s => s.hidden = s.id !== 'mode-' + m)
     render()
   }
-  document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
+  document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => {
+    const m = b.dataset.mode as Mode
+    if (m === 'clu') { cutTo(K_DEFAULT); focus = tree.root; setMode(m); zoomTo(tree.root) }   // the tab always opens the world in 8 clusters
+    else setMode(m)
+  })
   const rangeEl = $<HTMLSelectElement>('range'); rangeEl.onchange = () => { rangeQ = +rangeEl.value; renderSim() }
 
   // search
