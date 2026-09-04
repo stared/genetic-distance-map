@@ -28,8 +28,8 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
     const up = upRow = mkRow('anc', `<span class="tg dot"></span><span class="name">${esc(parent === t.root ? 'World' : o.name(parent))}</span>`, X0 - R)
     up.onclick = () => o.onSelect(parent)
     const isOpen = o.open.has(sel) && !t.isLeaf(sel)
-    selRow = mkRow('on', (t.isLeaf(sel) ? '<span class="tg none"></span>' : circle(isOpen ? '−' : '+', isOpen ? 'Merge into one cluster' : 'Split in two'))
-      + (isOpen ? '' : `<span class="sw" style="background:${o.colors.get(sel) ?? '#999'}"></span>`) + `<span class="name">${esc(o.name(sel))}</span>`, X0 - R)
+    selRow = mkRow('on', (isOpen ? '<span class="tg dot"></span>' : `<span class="sw" style="background:${o.colors.get(sel) ?? '#999'}"></span>`)
+      + `<span class="name">${esc(o.name(sel))}</span>` + (t.isLeaf(sel) ? '' : circle(isOpen ? '−' : '+', isOpen ? 'Merge into one cluster' : 'Split in two')), X0 - R)
     if (!t.isLeaf(sel)) selRow.querySelector<HTMLElement>('.tg')!.onclick = e => { e.stopPropagation(); isOpen ? o.onMerge(sel) : o.onSplit(sel) }
     selRow.onclick = () => o.onSelect(sel)
     selRow.onmouseenter = () => o.onHover(sel); selRow.onmouseleave = () => o.onHover(null)
@@ -39,7 +39,7 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
   const kids = (n: number) => { const nd = t.nodes[n]; return [nd.left, nd.right].sort((a, b) => t.nodes[b].size - t.nodes[a].size).filter(c => o.hasMembers(c)) }
   const walk = (n: number) => {
     if (o.open.has(n) && !t.isLeaf(n)) { kids(n).forEach(walk); return }
-    const row = mkRow('cut', (t.isLeaf(n) ? '<span class="tg none"></span>' : circle('+', 'Split in two')) + `<span class="sw" style="background:${o.colors.get(n) ?? '#999'}"></span><span class="name">${esc(o.name(n))}</span>`, DX - R)
+    const row = mkRow('cut', `<span class="sw" style="background:${o.colors.get(n) ?? '#999'}"></span><span class="name">${esc(o.name(n))}</span>` + (t.isLeaf(n) ? '' : circle('+', 'Split in two')), DX - R)
     if (!t.isLeaf(n)) row.querySelector<HTMLElement>('.tg')!.onclick = e => { e.stopPropagation(); o.onSplit(n) }
     row.onclick = () => o.onSelect(n)
     row.onmouseenter = () => o.onHover(n); row.onmouseleave = () => o.onHover(null)
@@ -48,8 +48,8 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
   if (o.open.has(sel) && !t.isLeaf(sel)) kids(sel).forEach(walk)
   // geometry after layout
   svg.setAttribute('width', String(box.clientWidth)); svg.setAttribute('height', String(box.scrollHeight))
-  const center = (e: HTMLElement) => { const g = e.querySelector<HTMLElement>('.tg')!; return { x: e.offsetLeft + g.offsetLeft + g.offsetWidth / 2, y: e.offsetTop + g.offsetTop + g.offsetHeight / 2 } }
-  const swatchLeft = (e: HTMLElement) => { const s = e.querySelector<HTMLElement>('.sw'); return s ? e.offsetLeft + s.offsetLeft : null }
+  // a row's anchor is its first mark (colour dot or node dot): lines attach there
+  const center = (e: HTMLElement) => { const g = e.firstElementChild as HTMLElement; return { x: e.offsetLeft + g.offsetLeft + g.offsetWidth / 2, y: e.offsetTop + g.offsetTop + g.offsetHeight / 2, r: g.offsetWidth / 2 } }
   const h0 = t.nodes[sel].height || 1, xj = (h: number) => X0 + (DX - X0) * (1 - Math.sqrt(Math.max(0, h) / h0))
   const pos = new Map<number, { x: number; y: number }>()
   const place = (n: number): { x: number; y: number } => {
@@ -68,7 +68,7 @@ export function renderTree(el: HTMLElement, o: TreeViewOpts) {
       else if (n === sel) line(p.x, Math.min(...cs.map(c => c.y)), p.x, Math.max(...cs.map(c => c.y)))
       else line(p.x, Math.min(...cs.map(c => c.y)), p.x, Math.max(...cs.map(c => c.y)))
       const px = n === sel && !atRoot ? center(selRow!).x : p.x
-      for (const [i, c] of cs.entries()) { const r = rowOf.get(ks[i]), end = r ? swatchLeft(r) : null; line(px, c.y, end ?? c.x - R, c.y) }   // through the handle to the colour dot
+      for (const [i, c] of cs.entries()) { const r = rowOf.get(ks[i]); line(px, c.y, r ? c.x - center(r).r : c.x - R, c.y) }
       if (n !== sel && n !== t.root) {   // merge handle at the junction (none on the world root)
         const g = svgEl('g', { class: 'junction', transform: `translate(${p.x},${p.y})` })
         g.appendChild(svgEl('circle', { r: R }))

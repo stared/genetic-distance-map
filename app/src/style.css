@@ -98,6 +98,7 @@ a { color: var(--accent); text-decoration: none; }
 .trow .tg.dot { background: radial-gradient(circle, var(--muted) 0 2.5px, transparent 3px); }
 .trow .tg.dot::before { display: none; }
 .trow .sw { flex: none; }
+.trow .tg.plus, .trow .tg.minus { margin-left: auto; }
 
 #tooltip { position: absolute; pointer-events: none; z-index: 10; background: #000; border: 1px solid #3f3f46; color: var(--fg); padding: 6px 9px; border-radius: 6px; font-size: 12px; max-width: 320px; }
 #tooltip .sub { color: var(--muted); }
