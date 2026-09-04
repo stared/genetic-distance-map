@@ -13,7 +13,6 @@
       <div id="modes" class="seg">
         <button data-mode="sim" class="active">Similarity</button>
         <button data-mode="clu">Clusters</button>
-        <button data-mode="split">Split</button>
       </div>
     </header>
 
@@ -28,13 +27,8 @@
     </section>
 
     <section id="mode-clu" class="mode" hidden>
-      <label class="field"><span>Clusters <b id="kVal">8</b></span><input type="range" id="k" min="0" max="60" step="1" value="10" /></label>
+      <div class="row"><label class="field grow"><span>Clusters <b id="kVal">8</b></span><input type="range" id="k" min="0" max="60" step="1" value="6" /></label><button id="creset" class="btn">Reset</button></div>
       <div id="clutree" class="tree"></div>
-    </section>
-
-    <section id="mode-split" class="mode" hidden>
-      <div class="crumbrow"><div id="crumbs" class="crumbs"></div><button id="reset" class="btn">Reset</button></div>
-      <div id="children" class="tree"></div>
     </section>
 
     <footer>Data from <a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a><br>Data viz by <a href="https://p.migdal.pl" target="_blank">Piotr Migdał</a> 2026</footer>

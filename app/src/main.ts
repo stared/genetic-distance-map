@@ -4,9 +4,10 @@ import { Tree } from './tree'
 import { HeatGrid, ramp } from './heat'
 import { loadWorld } from './world'
 import { FlatMap, type PointStyle } from './flatmap'
-import { renderTree, nameOf } from './treeview'
+import { renderTree } from './treeview'
+import { regionOf } from './regions'
 
-type Mode = 'sim' | 'clu' | 'split'
+type Mode = 'sim' | 'clu'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const disp = (s: string) => s.replace(/_/g, ' ')
 const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
@@ -19,7 +20,7 @@ async function main() {
     loadWorld()])
   const ERA: Record<string, string> = { pre: 'Prehistoric', anc: 'Ancient', med: 'Medieval', mod: 'Early modern' }
   const searchText = new Map(pops.map(p => [p.id, (p.label + (p.kind === 'a' ? '_' + ERA[p.era] : '_present-day')).toLowerCase().replace(/ /g, '_')]))
-  for (const p of pops) { const parts = (p.place ?? '').split(',').map(x => x.replace(/\(.*?\)/g, '').trim()).filter(Boolean); p.region = parts.length ? parts[parts.length - 1] : p.first }
+  for (const p of pops) p.region = regionOf(p.lat, p.lon)
   const byId = new Map(pops.map(p => [p.id, p]))
   const tree = new Tree(treesRaw.m)   // the map always shows present-day populations; ancient samples are queries only
   const heat = new HeatGrid(pops, world.landGeo)
@@ -81,7 +82,7 @@ async function main() {
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
-  // ---------- categorical colouring shared by clusters / drill-down
+  // ---------- categorical colouring of the map by cluster
   /** neighbour field over the locations that have at least one shown population */
   const field = heat.field('m', li => heat.locPops[li].some(id => visible[id]))
   function paintCategories(assign: Map<number, number>, colors: string[], inScope: (p: Pop) => boolean) {
@@ -92,50 +93,65 @@ async function main() {
     setPoints(p => { if (!visible[p.id]) return null; const c = assign.get(p.id); return c !== undefined ? colors[c] : inScope(p) ? '#71717a' : null }, p => assign.has(p.id) ? 1 : 0.5)
   }
 
-  // ---------- clusters
+  // ---------- clusters: the map shows the current cut of the tree; open nodes are split into their two children
   const kEl = $<HTMLInputElement>('k')
   const kSteps = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 45, 50, 55, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 400, 500, 600, 800, 1000]
-  kEl.max = String(kSteps.length - 1); kEl.value = '6'
-  const expanded = new Set<number>()
-  let clu: { roots: number[]; assign: Map<number, number>; colors: Map<number, string> } | null = null
-  { expanded.add(tree.root); const r = tree.nodes[tree.root]; expanded.add(r.left); expanded.add(r.right) }
-  function renderClusters() {
-    const k = kSteps[+kEl.value]; $('kVal').textContent = String(k)
-    const roots = tree.split(tree.root, k), assign = tree.assign(roots), colors = tree.colorMap(roots)
-    clu = { roots, assign, colors }
-    paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
-    const opts: Parameters<typeof renderTree>[1] = { tree, root: tree.root, cutRoots: new Set(roots), colors, byId, expanded, showRoot: false, visible: id => !!visible[id], onSelect: n => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)), onToggle: () => renderTree($('clutree'), opts) }
-    renderTree($('clutree'), opts); syncUrl()
+  kEl.max = String(kSteps.length - 1)
+  const K_DEFAULT = 8
+  const open = new Set<number>()
+  const cutTo = (k: number) => { open.clear(); open.add(tree.root); for (const r of tree.split(tree.root, k)) for (const a of tree.ancestors(r)) if (a !== r) open.add(a) }
+  const cutLeaves = () => { const out: number[] = []; const rec = (n: number) => { const nd = tree.nodes[n]; for (const c of [nd.left, nd.right]) (open.has(c) && !tree.isLeaf(c)) ? rec(c) : out.push(c) }; rec(tree.root); return out.sort((a, b) => tree.nodes[b].size - tree.nodes[a].size) }
+  // a branch is named by the areas it holds most of (at least half of the parent's populations there): whole
+  // continents when it owns them, else subregions; ranked by count, kept until 75% of the branch is covered, max 3
+  const CONTINENTS: Record<string, string[]> = {
+    'Europe': ['Northern Europe', 'British Isles', 'Western Europe', 'Iberia', 'Italy', 'Balkans', 'Greece', 'Central Europe', 'Eastern Europe'],
+    'Middle East & North Africa': ['Caucasus', 'Anatolia', 'Levant', 'Arabia', 'Iran & Iraq', 'North Africa'],
+    'Sub-Saharan Africa': ['Sudan & Horn of Africa', 'West Africa', 'Central Africa', 'East Africa', 'Southern Africa'],
+    'East & Southeast Asia': ['East Asia', 'Southeast Asia'],
+    'Americas': ['North America', 'Mesoamerica & Caribbean', 'South America'] }
+  const nameCache = new Map<number, string>()
+  const regionCounts = (node: number) => { const c = new Map<string, number>(); for (const id of tree.members(node)) if (visible[id]) { const r = byId.get(id)!.region!; c.set(r, (c.get(r) ?? 0) + 1) } return c }
+  const nameOfNode = (node: number) => {
+    let s = nameCache.get(node); if (s) return s
+    const mem = tree.members(node).filter(id => visible[id]).map(id => byId.get(id)!)
+    if (mem.length <= 3) s = mem.map(p => disp(p.first)).filter((v, i, a) => a.indexOf(v) === i).join(', ')
+    else {
+      const cn = regionCounts(node), parent = tree.nodes[node].parent, cp = parent >= 0 ? regionCounts(parent) : cn
+      const sum = (c: Map<string, number>, rs: string[]) => rs.reduce((t, r) => t + (c.get(r) ?? 0), 0)
+      const cand: [string, number][] = [], used = new Set<string>()
+      for (const [cont, rs] of Object.entries(CONTINENTS)) { const n = sum(cn, rs), np = sum(cp, rs); if (n >= 0.1 * mem.length && n / np >= 0.5) { cand.push([cont, n]); rs.forEach(r => used.add(r)) } }
+      for (const [r, c] of cn) if (!used.has(r) && r !== 'other' && r !== 'unplaced' && c / (cp.get(r) ?? c) >= 0.5) cand.push([r, c])
+      cand.sort((a, b) => b[1] - a[1])
+      const names: string[] = []; let covered = 0
+      for (const [r, c] of cand) { names.push(r); covered += c; if (names.length >= 3 || covered >= 0.75 * mem.length) break }
+      if (!names.length) { const c = new Map<string, number>(); mem.forEach(p => c.set(p.first, (c.get(p.first) ?? 0) + 1)); names.push(...[...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([f]) => disp(f))) }
+      s = names.join(', ')
+    }
+    nameCache.set(node, s); return s
   }
-
-  // ---------- split
-  let path: number[] = []
-  let drill: { children: number[]; assign: Map<number, number> } | null = null
-  function renderDrill(zoom: boolean) {
-    if (!path.length) path = [tree.root]
-    const node = path[path.length - 1]
-    const children = tree.split(node, 3), assign = tree.assign(children), colors = tree.colorMap(children, node)
-    drill = { children, assign }
-    const scope = tree.assign([node])
-    paintCategories(assign, children.map(c => colors.get(c)!), p => scope.has(p.id))
-    const crumbs = $('crumbs'); crumbs.innerHTML = ''
-    path.forEach((n, i) => { const s = document.createElement('span'); s.textContent = i === 0 ? 'World' : nameOf(tree, n, byId, 2); s.onclick = () => { path = path.slice(0, i + 1); renderDrill(true) }; crumbs.appendChild(s) })
-    renderTree($('children'), { tree, root: node, cutRoots: new Set(children), colors, byId, expanded: new Set([node]), showRoot: false, flat: true, visible: id => !!visible[id], onSelect: n => descend(n), onToggle: () => {} })
-    if (zoom) fitTo(tree.members(node).map(id => byId.get(id)!))
+  let clu: { roots: number[]; assign: Map<number, number>; colors: Map<number, string> } | null = null
+  cutTo(K_DEFAULT)
+  const splitAndZoom = (n: number) => { if (!tree.isLeaf(n)) open.add(n); renderClusters(); fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)) }
+  function renderClusters() {
+    const roots = cutLeaves(), assign = tree.assign(roots), colors = tree.colorMap(roots)
+    clu = { roots, assign, colors }
+    $('kVal').textContent = String(roots.length); kEl.value = String(Math.max(0, kSteps.filter(k => k <= roots.length).length - 1))
+    paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
+    renderTree($('clutree'), { tree, open, colors, byId, visible: id => !!visible[id], name: nameOfNode, onRow: splitAndZoom, onToggle: n => { open.has(n) ? open.delete(n) : open.add(n); renderClusters() } })
     syncUrl()
   }
-  function descend(node: number) { if (!drill || tree.isLeaf(node)) return; path.push(node); renderDrill(true) }
+  kEl.oninput = () => { cutTo(kSteps[+kEl.value]); renderClusters() }
+  $('creset').onclick = () => { cutTo(K_DEFAULT); renderClusters() }
 
   // ---------- modes & controls
-  function render() { if (mode === 'sim') renderSim(); else if (mode === 'clu') renderClusters(); else renderDrill(false) }
-  // ---------- shareable URL: ?q=Polish&scale=regional&map=lon,lat,zoom | ?view=clusters&k=8 | ?view=split&path=…
+  function render() { if (mode === 'sim') renderSim(); else renderClusters() }
+  // ---------- shareable URL: ?q=Polish&scale=regional&map=lon,lat,zoom | ?view=clusters&open=…
   const SCALE_NAME: Record<string, string> = { '0.05': 'close', '0.25': 'regional', '1': 'global' }
   let urlTimer = 0
   function syncUrl() {
     const u = new URLSearchParams()
     if (mode === 'sim') { if (query) u.set('q', query.core); if (rangeQ !== 0.25) u.set('scale', SCALE_NAME[String(rangeQ)]) }
-    else if (mode === 'clu') { u.set('view', 'clusters'); u.set('k', String(kSteps[+kEl.value])) }
-    else { u.set('view', 'split'); if (path.length > 1) u.set('path', path.slice(1).join(',')) }
+    else { u.set('view', 'clusters'); u.set('open', [...open].filter(n => n !== tree.root).join(',')) }
     const v = map.view(); u.set('map', `${v.lon.toFixed(2)},${v.lat.toFixed(2)},${Math.round(v.k)}`)
     history.replaceState(null, '', '?' + u.toString().replace(/%2C/g, ','))
   }
@@ -148,8 +164,6 @@ async function main() {
   }
   document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode as Mode))
   const rangeEl = $<HTMLSelectElement>('range'); rangeEl.onchange = () => { rangeQ = +rangeEl.value; renderSim() }
-  kEl.oninput = renderClusters
-  $('reset').onclick = () => { path = []; renderDrill(true) }
 
   // search
   const search = $<HTMLInputElement>('search'), suggest = $<HTMLUListElement>('suggest')
@@ -212,20 +226,19 @@ async function main() {
     if (!p) { tip.hidden = true; return }
     let extra = ''
     if (mode === 'sim' && query) extra = `<br>distance ${raw[p.id].toFixed(2)}`
-    const cl = mode === 'clu' ? clu : mode === 'split' ? drill : null
-    if (cl) { const c = cl.assign.get(p.id); const roots = mode === 'clu' ? clu!.roots : drill!.children; if (c !== undefined) extra = '<br>branch: ' + esc(nameOf(tree, roots[c], byId)) }
+    if (mode === 'clu' && clu) { const c = clu.assign.get(p.id); if (c !== undefined) extra = '<br>cluster: ' + esc(nameOfNode(clu.roots[c])) }
     tip.innerHTML = `<b>${esc(disp(p.core))}</b><br><span class="sub">${esc(p.place ?? 'no location')}<br>${tags(p).join(', ')}${extra}</span>`
     tip.hidden = false; tip.style.left = x + 14 + 'px'; tip.style.top = y + 14 + 'px'
   }
   map.onClick = (lng, lat, p) => {
-    if (mode === 'split') {
-      if (!drill) return
-      let c = p ? drill.assign.get(p.id) : undefined
+    if (mode === 'clu') {
+      if (!clu) return
+      let c = p ? clu.assign.get(p.id) : undefined
       if (c === undefined) {
-        const near = pops.filter(q => q.lat != null && visible[q.id] && drill!.assign.has(q.id)).map(q => ({ q, km: haversine(lat, lng, q.lat!, q.lon!) })).sort((a, b) => a.km - b.km)[0]
-        if (near && near.km < 800) c = drill.assign.get(near.q.id)
+        const near = pops.filter(q => q.lat != null && visible[q.id] && clu!.assign.has(q.id)).map(q => ({ q, km: haversine(lat, lng, q.lat!, q.lon!) })).sort((a, b) => a.km - b.km)[0]
+        if (near && near.km < 800) c = clu.assign.get(near.q.id)
       }
-      if (c !== undefined) descend(drill.children[c]); return
+      if (c !== undefined) splitAndZoom(clu.roots[c]); return
     }
     if (p) selectPop(p, false)
   }
@@ -235,12 +248,10 @@ async function main() {
   const hasMap = mapParam.length === 3 && mapParam.every(Number.isFinite)
   const scaleQ = Object.entries(SCALE_NAME).find(([, n]) => n === u.get('scale'))?.[0]
   if (scaleQ) { rangeQ = +scaleQ; rangeEl.value = scaleQ }
-  if (u.get('view') === 'clusters') { const ki = kSteps.indexOf(+(u.get('k') ?? '')); if (ki >= 0) kEl.value = String(ki); setMode('clu') }
-  else if (u.get('view') === 'split') {
-    const ids = (u.get('path') ?? '').split(',').filter(Boolean).map(Number)
-    const under = (id: number, anc: number) => { let n = id; while (n >= 0 && n !== anc) n = tree.nodes[n].parent; return n === anc }
-    path = [tree.root]; for (const id of ids) { if (tree.nodes[id] && under(id, path[path.length - 1])) path.push(id); else break }
-    setMode('split'); renderDrill(!hasMap)
+  if (u.get('view') === 'clusters') {
+    const ids = (u.get('open') ?? '').split(',').filter(Boolean).map(Number).filter(n => tree.nodes[n] && !tree.isLeaf(n))
+    if (ids.length) { open.clear(); open.add(tree.root); ids.forEach(n => open.add(n)) }
+    setMode('clu')
   }
   else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
   if (hasMap) map.flyTo(mapParam[0], mapParam[1], mapParam[2], 0)

@@ -77,22 +77,17 @@ a { color: var(--accent); text-decoration: none; }
 .grp .more:hover { color: var(--fg); }
 
 .tree { display: flex; flex-direction: column; }
-.tn { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-radius: 5px; cursor: pointer; }
+.tn { display: flex; align-items: baseline; gap: 6px; padding: 5px 4px; border-radius: 5px; cursor: pointer; }
 .tn:hover { background: var(--hover); }
 .tn .tw { width: 14px; color: var(--faint); font-size: 10px; text-align: center; flex: none; }
 .tn .tw.open { transform: rotate(90deg); }
-.tn .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tn .name { flex: 1; }
+.tn.branch { color: var(--muted); }
+.tn.branch .num { color: var(--faint); }
 .tn .num { color: var(--muted); }
 .tn.on { background: var(--hover); }
 .tk { padding-left: 16px; }
-.crumbrow { display: flex; align-items: center; gap: 8px; }
-.crumbrow .crumbs { flex: 1; }
-.crumbs { color: var(--muted); font-size: 12px; }
-.crumbs span { cursor: pointer; }
-.crumbs span:hover { color: var(--accent); }
-.crumbs span::after { content: " / "; color: var(--faint); }
-.crumbs span:last-child::after { content: ""; }
-.crumbs span:last-child { color: var(--fg); font-weight: 600; }
+.row { display: flex; align-items: flex-end; gap: 12px; }
 
 #tooltip { position: absolute; pointer-events: none; z-index: 10; background: #000; border: 1px solid #3f3f46; color: var(--fg); padding: 6px 9px; border-radius: 6px; font-size: 12px; max-width: 320px; }
 #tooltip .sub { color: var(--muted); }
