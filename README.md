@@ -20,10 +20,13 @@ never drawn). Ancient samples are available only as similarity queries through t
   (prehistoric, ancient, medieval, early modern) are searchable, and words combine ("medieval poland").
 - **Clusters**: Ward hierarchical clustering of present-day populations. The map is coloured
   Voronoi-style by the cluster of the nearest sampled location, with hierarchical hues (nearby hues are
-  nearby branches). The panel is the tree: the slider cuts it into k clusters, clicking a row or a map
-  region splits that cluster into its two children and zooms to it, the triangle merges it back, Reset
-  returns to 8. Branches are named by the areas they hold most of (continents when they own them,
-  subregions otherwise, derived from coordinates in `app/src/regions.ts`).
+  nearby branches). The panel is a dendrogram of the branch in focus down to the current cut, with
+  branch lengths proportional to Ward distance. The slider cuts the whole tree into k clusters; clicking
+  a cluster row or a map region splits it into its two children, focuses on it (its children take the
+  whole hue circle, everything else goes grey) and zooms the map; clicking a junction focuses there,
+  clicking the focused junction merges it back; breadcrumbs and Reset lead back up. Branches are named
+  by the areas they hold most of (continents when they own them, subregions otherwise, derived from
+  coordinates in `app/src/regions.ts`).
 
 Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
 wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each cell holds its 6
@@ -33,9 +36,9 @@ islands smaller than a cell are still painted. The raster is drawn with the map 
 clipped to the vector coastline. The app opens on a default query.
 
 Shareable URLs: the address bar always reflects the current state, e.g.
-`?q=Polish&scale=close&map=15.00,48.00,1400`, `?q=Russia_Samara_EBA_Yamnaya`, `?view=clusters&open=3683,3682`
+`?q=Polish&scale=close&map=15.00,48.00,1400`, `?q=Russia_Samara_EBA_Yamnaya`, `?view=clusters&open=3683,3682&focus=3682`
 (`map` is centre longitude, latitude and Mercator scale; `scale` is close, regional or global; `open` lists the
-tree nodes that are split).
+tree nodes that are split and `focus` the branch in view).
 
 ## Run
 

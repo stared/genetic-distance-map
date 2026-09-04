@@ -4,7 +4,7 @@ import { Tree } from './tree'
 import { HeatGrid, ramp } from './heat'
 import { loadWorld } from './world'
 import { FlatMap, type PointStyle } from './flatmap'
-import { renderTree } from './treeview'
+import { renderDendro } from './treeview'
 import { regionOf } from './regions'
 
 type Mode = 'sim' | 'clu'
@@ -130,18 +130,27 @@ async function main() {
     nameCache.set(node, s); return s
   }
   let clu: { roots: number[]; assign: Map<number, number>; colors: Map<number, string> } | null = null
+  let focus = tree.root                        // the branch in view: its clusters take the whole hue circle, the rest is grey
+  const GREY = '#52525b'
+  const under = (id: number, anc: number) => { let n = id; while (n >= 0 && n !== anc) n = tree.nodes[n].parent; return n === anc }
   cutTo(K_DEFAULT)
-  const splitAndZoom = (n: number) => { if (!tree.isLeaf(n)) open.add(n); renderClusters(); fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!)) }
+  const zoomTo = (n: number) => fitTo(tree.members(n).filter(id => visible[id]).map(id => byId.get(id)!))
+  const focusOn = (n: number) => { if (!tree.isLeaf(n)) { open.add(n); focus = n } renderClusters(); zoomTo(n) }
+  const focusTo = (n: number) => { focus = n; renderClusters(); zoomTo(n) }
+  const mergeBack = (n: number) => { open.delete(n); focus = tree.nodes[n].parent >= 0 ? tree.nodes[n].parent : tree.root; renderClusters(); zoomTo(focus) }
   function renderClusters() {
-    const roots = cutLeaves(), assign = tree.assign(roots), colors = tree.colorMap(roots)
+    if (!under(focus, tree.root) || !open.has(focus)) focus = tree.root
+    const roots = cutLeaves(), assign = tree.assign(roots), colors = tree.colorMap(roots.filter(r => under(r, focus)), focus)
+    for (const r of roots) if (!colors.has(r)) colors.set(r, GREY)
     clu = { roots, assign, colors }
     $('kVal').textContent = String(roots.length); kEl.value = String(Math.max(0, kSteps.filter(k => k <= roots.length).length - 1))
     paintCategories(assign, roots.map(r => colors.get(r)!), () => false)
-    renderTree($('clutree'), { tree, open, colors, byId, visible: id => !!visible[id], name: nameOfNode, onRow: splitAndZoom, onToggle: n => { open.has(n) ? open.delete(n) : open.add(n); renderClusters() } })
+    renderDendro($('clutree'), { tree, open, focus, colors, name: nameOfNode, hasMembers: n => tree.members(n).some(id => visible[id]),
+      onLeaf: focusOn, onJunction: n => n === focus ? mergeBack(n) : focusTo(n), onCrumb: focusTo })
     syncUrl()
   }
-  kEl.oninput = () => { cutTo(kSteps[+kEl.value]); renderClusters() }
-  $('creset').onclick = () => { cutTo(K_DEFAULT); renderClusters() }
+  kEl.oninput = () => { cutTo(kSteps[+kEl.value]); focus = tree.root; renderClusters() }
+  $('creset').onclick = () => { cutTo(K_DEFAULT); focus = tree.root; renderClusters(); map.flyTo(20, 30, 0) }
 
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else renderClusters() }
@@ -151,7 +160,7 @@ async function main() {
   function syncUrl() {
     const u = new URLSearchParams()
     if (mode === 'sim') { if (query) u.set('q', query.core); if (rangeQ !== 0.25) u.set('scale', SCALE_NAME[String(rangeQ)]) }
-    else { u.set('view', 'clusters'); u.set('open', [...open].filter(n => n !== tree.root).join(',')) }
+    else { u.set('view', 'clusters'); u.set('open', [...open].filter(n => n !== tree.root).join(',')); if (focus !== tree.root) u.set('focus', String(focus)) }
     const v = map.view(); u.set('map', `${v.lon.toFixed(2)},${v.lat.toFixed(2)},${Math.round(v.k)}`)
     history.replaceState(null, '', '?' + u.toString().replace(/%2C/g, ','))
   }
@@ -238,7 +247,7 @@ async function main() {
         const near = pops.filter(q => q.lat != null && visible[q.id] && clu!.assign.has(q.id)).map(q => ({ q, km: haversine(lat, lng, q.lat!, q.lon!) })).sort((a, b) => a.km - b.km)[0]
         if (near && near.km < 800) c = clu.assign.get(near.q.id)
       }
-      if (c !== undefined) splitAndZoom(clu.roots[c]); return
+      if (c !== undefined) focusOn(clu.roots[c]); return
     }
     if (p) selectPop(p, false)
   }
@@ -251,6 +260,7 @@ async function main() {
   if (u.get('view') === 'clusters') {
     const ids = (u.get('open') ?? '').split(',').filter(Boolean).map(Number).filter(n => tree.nodes[n] && !tree.isLeaf(n))
     if (ids.length) { open.clear(); open.add(tree.root); ids.forEach(n => open.add(n)) }
+    const f = Number(u.get('focus')); if (tree.nodes[f]) focus = f
     setMode('clu')
   }
   else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, 0) }
