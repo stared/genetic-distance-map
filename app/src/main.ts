@@ -35,41 +35,43 @@ async function main() {
   pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
   const subOf = (p: Pop) => { const s = disp(p.core.startsWith(p.first + '_') ? p.core.slice(p.first.length + 1) : p.core === p.first ? '' : p.core); return p.profile ? `${s}${s ? ' ' : ''}(${p.profile.replace(/ Profile$/, '')})` : s }
-  const describe = (p: Pop) => `${esc(p.place ?? 'no location')}<br>${[`n=${p.n}`, p.kind === 'a' ? 'ancient' : '', p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : '', flags(p)].filter(Boolean).join(', ')}`
+  const tags = (p: Pop) => [`n=${p.n}`, p.kind === 'a' ? 'ancient' : '', p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : '', flags(p)].filter(Boolean)
+  const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 22s7-7.1 7-12.5A7 7 0 0 0 5 9.5C5 14.9 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg>'
+  const meta = (p: Pop) => `<span class="loc">${PIN}${esc(p.place ?? 'no location')}</span>` + tags(p).map(t => `<span>${t}</span>`).join('')
 
   // ---------- similarity
-  let query: { name: string; sub: string; c: number[]; fresh: boolean } | null = null
+  let query: { name: string; meta: string; c: number[]; fresh: boolean } | null = null
   const d = new Float32Array(pops.length), raw = new Float32Array(pops.length)
   let d0 = 0                                   // colour scale runs from d0 (nearest shown population) to dmax
-  const dmaxEl = $<HTMLInputElement>('dmax'), dminEl = $('dmin')
+  const dmaxEl = $<HTMLInputElement>('dmax'), dminEl = $('dmin'), dmaxV = $('dmaxv'), legend = $('legend')
   $('ramp').style.background = `linear-gradient(to right, ${[0, .1, .2, .35, .5, .7, 1].map(t => ramp(Math.sqrt(t))).join(',')})`
   function renderSim() {
-    if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; return }
+    if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; legend.hidden = true; return }
     for (const p of pops) raw[p.id] = 100 * dist(query.c, p.c)
     const sorted = pops.filter(p => visible[p.id]).sort((a, b) => raw[a.id] - raw[b.id])
     d0 = Math.floor(raw[sorted[0].id])
-    if (query.fresh) { query.fresh = false; dmaxEl.value = String(Math.min(99, Math.max(d0 + 5, Math.round(raw[sorted[Math.floor(sorted.length / 4)].id])))) }
+    dmaxEl.min = String(d0 + 2); dmaxEl.max = String(Math.max(60, d0 + 40))
+    if (query.fresh) { query.fresh = false; dmaxEl.value = String(Math.min(+dmaxEl.max, Math.max(d0 + 5, Math.round(raw[sorted[Math.floor(sorted.length / 4)].id])))) }
     const dmax = Math.max(d0 + 1, +dmaxEl.value || 20), span = dmax - d0
-    dminEl.textContent = String(d0)
+    dminEl.textContent = String(d0); dmaxV.textContent = String(dmax); $('lname').textContent = query.name; legend.hidden = false
     for (const p of pops) d[p.id] = Math.max(0, raw[p.id] - d0)
     heat.renderHeat(field, d, visible, span); map.setRaster(0.7)
     setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], span) : null, () => 1)
-    $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="sub">${query.sub}</div>`
+    $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="meta">${query.meta}</div>`
     const top = sorted.slice(0, 80)
     const groups = new Map<string, Pop[]>(); top.forEach(p => { const g = groups.get(p.first); g ? g.push(p) : groups.set(p.first, [p]) })
     const list = $('nearest'); list.innerHTML = ''
     for (const [first, mem] of groups) {
       const best = mem[0]
       const g = document.createElement('div'); g.className = 'grp'
-      const all = mem.filter(p => subOf(p)), shown = all.slice(0, 8)
-      const subs = shown.map(p => `<span data-id="${p.id}" title="${esc(p.label)}">${esc(subOf(p))} <i>${raw[p.id].toFixed(2)}</i></span>`).join('') + (all.length > shown.length ? `<span class="n">+${all.length - shown.length} more</span>` : '')
+      const subs = mem.filter(p => subOf(p)).map(p => `<span data-id="${p.id}" title="${esc(p.label)}">${esc(subOf(p))} <i>${raw[p.id].toFixed(2)}</i></span>`).join('')
       g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], span)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${raw[best.id].toFixed(2)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
       g.addEventListener('click', e => { const t = (e.target as HTMLElement).closest('[data-id]') as HTMLElement | null; selectPop(byId.get(t ? +t.dataset.id! : best.id)!, true) })
       list.appendChild(g)
     }
   }
   function selectPop(p: Pop, fly: boolean) {
-    query = { name: disp(p.core), sub: describe(p), c: p.c, fresh: true }
+    query = { name: disp(p.core), meta: meta(p), c: p.c, fresh: true }
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
@@ -120,7 +122,7 @@ async function main() {
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else if (mode === 'clu') renderClusters(); else renderDrill(false) }
   function setMode(m: Mode) {
-    mode = m
+    mode = m; legend.hidden = m !== 'sim' || !query
     document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m))
     document.querySelectorAll<HTMLElement>('.mode').forEach(s => s.hidden = s.id !== 'mode-' + m)
     render()
@@ -173,7 +175,7 @@ async function main() {
     if (mode === 'sim' && query) extra = `<br>distance ${raw[p.id].toFixed(2)}`
     const cl = mode === 'clu' ? clu : mode === 'split' ? drill : null
     if (cl) { const c = cl.assign.get(p.id); const roots = mode === 'clu' ? clu!.roots : drill!.children; if (c !== undefined) extra = '<br>branch: ' + esc(nameOf(tree, roots[c], byId)) }
-    tip.innerHTML = `<b>${esc(disp(p.core))}</b><br><span class="sub">${describe(p)}${extra}</span>`
+    tip.innerHTML = `<b>${esc(disp(p.core))}</b><br><span class="sub">${esc(p.place ?? 'no location')}<br>${tags(p).join(', ')}${extra}</span>`
     tip.hidden = false; tip.style.left = x + 14 + 'px'; tip.style.top = y + 14 + 'px'
   }
   map.onClick = (lng, lat, p) => {

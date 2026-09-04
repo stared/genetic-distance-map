@@ -19,14 +19,11 @@
 
     <section id="mode-sim" class="mode">
       <div class="search">
-        <input id="search" type="search" placeholder="Search population" autocomplete="off" spellcheck="false" />
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search" type="search" placeholder="Search present-day or ancient population" autocomplete="off" spellcheck="false" />
         <ul id="suggest" hidden></ul>
       </div>
       <div id="query" class="query"></div>
-      <div class="legend">
-        <div class="legend-head"><span>Distance</span><span class="legend-max"><span id="dmin">0</span> – <input type="number" id="dmax" min="1" max="99" step="1" value="20" /></span></div>
-        <div class="ramp" id="ramp"></div>
-      </div>
       <div id="nearest" class="list"></div>
     </section>
 
@@ -42,7 +39,14 @@
 
     <footer>Data from <a href="https://genarchivist.net/showthread.php?tid=1449" target="_blank">Moriopoulos Collection 2025</a><br>Data viz by <a href="https://p.migdal.pl" target="_blank">Piotr Migdał</a> 2026</footer>
   </aside>
-  <div id="map"></div>
+  <div id="map">
+    <div id="legend" hidden>
+      <div class="lt">Distance to <b id="lname"></b></div>
+      <div class="ramp" id="ramp"></div>
+      <div class="lx"><span id="dmin">0</span><span id="dmaxv">20</span></div>
+      <input type="range" id="dmax" min="2" max="60" step="1" value="20" />
+    </div>
+  </div>
   <div id="tooltip" hidden></div>
 </div>
 <script type="module" src="./src/main.ts"></script>
