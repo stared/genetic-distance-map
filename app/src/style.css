@@ -70,6 +70,8 @@ a { color: var(--accent); text-decoration: none; }
 .grp .subs { margin: 3px 0 0 17px; color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 1px 12px; }
 .grp .subs span:hover { color: var(--fg); }
 .grp .subs i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+.grp .more { font: inherit; color: var(--faint); background: none; border: 0; padding: 0; cursor: pointer; }
+.grp .more:hover { color: var(--fg); }
 
 .tree { display: flex; flex-direction: column; }
 .tn { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-radius: 5px; cursor: pointer; }
