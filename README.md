@@ -14,8 +14,10 @@ never drawn). Ancient samples are available only as similarity queries through t
   population is coloured by its G25 distance to the query (Euclidean on scaled coordinates, ×100 as
   in Vahaduo) and an inverse-distance-weighted heatmap is drawn over land. The colour scale runs from
   the nearest population to the 25th-percentile distance by default and the upper bound is editable.
-  The list is the ranked nearest populations grouped by ethnonym. The empty search box offers the
-  most-sampled present-day groups (represented by their medoid entry) and the largest ancient samples.
+  The list is the ranked nearest populations grouped by ethnonym. While searching, the results take over
+  the panel: curated top picks (Mycenaean Greece, Imperial Rome, Vikings, Yamnaya…), the most-sampled
+  present-day groups (represented by their medoid entry), and the largest samples of each era. Era words
+  (prehistoric, ancient, medieval, early modern) are searchable, and words combine ("medieval poland").
 - **Clusters**: Ward hierarchical clustering of present-day populations cut into k clusters. Land is
   coloured Voronoi-style by the cluster of the nearest sampled location; colours are hierarchical
   (hue divided along the tree, so nearby hues are nearby branches). The panel is a collapsible tree

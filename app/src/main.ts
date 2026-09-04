@@ -17,6 +17,8 @@ async function main() {
     fetch('./data/pops.json').then(r => r.json()) as Promise<Pop[]>,
     fetch('./data/trees.json').then(r => r.json()) as Promise<Record<'m' | 'a' | 'all', TreeData>>,
     loadWorld()])
+  const ERA: Record<string, string> = { pre: 'Prehistoric', anc: 'Ancient', med: 'Medieval', mod: 'Early modern' }
+  const searchText = new Map(pops.map(p => [p.id, (p.label + (p.kind === 'a' ? '_' + ERA[p.era] : '_present-day')).toLowerCase().replace(/ /g, '_')]))
   for (const p of pops) { const parts = (p.place ?? '').split(',').map(x => x.replace(/\(.*?\)/g, '').trim()).filter(Boolean); p.region = parts.length ? parts[parts.length - 1] : p.first }
   const byId = new Map(pops.map(p => [p.id, p]))
   const tree = new Tree(treesRaw.m)   // the map always shows present-day populations; ancient samples are queries only
@@ -35,7 +37,6 @@ async function main() {
   pops.forEach(p => visible[p.id] = isVisible(p) ? 1 : 0)
   const flags = (p: Pop) => [p.o ? 'outlier' : '', p.low ? 'low-res' : '', p.cont ? 'contaminated' : ''].filter(Boolean).join(', ')
   const subOf = (p: Pop) => { const s = disp(p.core.startsWith(p.first + '_') ? p.core.slice(p.first.length + 1) : p.core === p.first ? '' : p.core); return p.profile ? `${s}${s ? ' ' : ''}(${p.profile.replace(/ Profile$/, '')})` : s }
-  const ERA: Record<string, string> = { pre: 'Prehistoric', anc: 'Ancient', med: 'Medieval', mod: 'Early modern' }
   const tags = (p: Pop) => [`n=${p.n}`, p.kind === 'a' ? ERA[p.era].toLowerCase() : '', p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : '', flags(p)].filter(Boolean)
   const PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 22s7-7.1 7-12.5A7 7 0 0 0 5 9.5C5 14.9 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.5"/></svg>'
   const meta = (p: Pop) => `<span class="loc">${PIN}${esc(p.place ?? 'no location')}</span>` + tags(p).map(t => `<span>${t}</span>`).join('')
@@ -150,32 +151,46 @@ async function main() {
     return mem.sort((x, y) => dist(x.c, mean) - dist(y.c, mean))[0]
   }
   type Row = { p: Pop; name: string; n: number }
-  type Groups = Partial<Record<'m' | 'pre' | 'anc' | 'med' | 'mod', Row[]>>
+  type Groups = Partial<Record<'pick' | 'm' | 'pre' | 'anc' | 'med' | 'mod', Row[]>>
   const rowOf = (p: Pop): Row => ({ p, name: disp(p.core), n: p.n })
   const ERAS = ['pre', 'anc', 'med', 'mod'] as const
   const ancientBy = (era: string) => uniq(pops.filter(p => p.kind === 'a' && clean(p) && p.era === era).sort(byN))
-  const starters: Groups = { m: [...groupN.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([f, n]) => ({ p: rep(f), name: disp(f), n })) }
+  // curated picks people ask about first: well-known ancient groups with a decent sample
+  const PICKS: [string, string][] = [
+    ['Mycenaean Greece', 'Greece_LBA_Mycenaean_Messenia'], ['Imperial Rome', 'Italy_Lazio_Roman_Empire_Rome'], ['Canaanites, Megiddo', 'Israel_LBA_Megiddo'],
+    ['Vikings, Sweden', 'Sweden_Early-High_Medieval_Viking_Age_Skara'], ['Anglo-Saxons', 'England_Late_Antiquity-Early_Medieval_Anglo-Saxon_Dover_Buckland'],
+    ['Celts, La Tène', 'Czechia_IA_La_Tene'], ['Yamnaya steppe herders', 'Russia_Samara_EBA_Yamnaya'], ['Anatolian Neolithic farmers', 'Anatolia_N_Ceramic_Barcin'],
+    ['Classic Maya', 'Mexico_Classic_Maya_Chichen_Itza'], ['Xiongnu', 'Mongolia_IA_Xiongnu_Late']]
+  const byCore = (core: string) => pops.filter(p => p.core === core && clean(p)).sort(byN)[0]
+  const starters: Groups = { pick: PICKS.map(([name, core]) => byCore(core)).filter(Boolean).map((p, i) => ({ p, name: PICKS[i][0], n: p.n })),
+    m: [...groupN.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([f, n]) => ({ p: rep(f), name: disp(f), n })) }
   for (const e of ERAS) starters[e] = ancientBy(e).slice(0, 4).map(rowOf)
+  const HEAD: Record<string, string> = { pick: 'Top picks', m: 'Present-day', ...ERA }
+  // while searching, the suggestions take over the panel below the box
+  const searching = (on: boolean) => { suggest.hidden = !on; $('query').hidden = on; $('nearest').hidden = on }
   function showSuggest(groups: Groups) {
     suggest.innerHTML = ''; let any = false
-    for (const key of ['m', 'pre', 'anc', 'med', 'mod'] as const) {
+    for (const key of ['pick', 'm', 'pre', 'anc', 'med', 'mod'] as const) {
       const list = groups[key]; if (!list?.length) continue; any = true
-      const hd = document.createElement('li'); hd.className = 'hd'; hd.textContent = key === 'm' ? 'Present-day' : ERA[key]; suggest.appendChild(hd)
-      for (const r of list) { const li = document.createElement('li'); li.innerHTML = `<span>${esc(r.name)}</span><span class="sub">n=${r.n}</span>`; li.onmousedown = () => { search.value = ''; suggest.hidden = true; selectPop(r.p, true) }; suggest.appendChild(li) }
+      const hd = document.createElement('li'); hd.className = 'hd'; hd.textContent = HEAD[key]; suggest.appendChild(hd)
+      for (const r of list) { const li = document.createElement('li'); li.innerHTML = `<span>${esc(r.name)}</span><span class="sub">n=${r.n}</span>`; li.onmousedown = () => { search.value = ''; searching(false); selectPop(r.p, true) }; suggest.appendChild(li) }
     }
-    suggest.hidden = !any
+    if (!any) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'No population matches'; suggest.appendChild(li) }
+    searching(true)
   }
   search.oninput = search.onfocus = () => {
     const q = search.value.trim().toLowerCase().replace(/ /g, '_')
     if (!q.length) { showSuggest(starters); return }
-    const atWord = (p: Pop) => { const i = p.label.toLowerCase().indexOf(q); return i === 0 || p.label[i - 1] === '_' ? 0 : 1 }
+    const words = q.split('_').filter(Boolean)
+    const atWord = (p: Pop) => { const s = searchText.get(p.id)!, i = s.indexOf(words[0]); return i === 0 || s[i - 1] === '_' ? 0 : 1 }
     const rank = (a: Pop, b: Pop) => atWord(a) - atWord(b) || b.n - a.n
-    const hits = pops.filter(p => p.label.toLowerCase().includes(q)).sort(rank)
+    const hits = pops.filter(p => { const s = searchText.get(p.id)!; return words.every(w => s.includes(w)) }).sort(rank)
     const g: Groups = { m: uniq(hits.filter(p => p.kind === 'm')).slice(0, 20).map(rowOf) }
     for (const e of ERAS) g[e] = uniq(hits.filter(p => p.kind === 'a' && p.era === e)).slice(0, 12).map(rowOf)
     showSuggest(g)
   }
-  search.onblur = () => setTimeout(() => suggest.hidden = true, 150)
+  search.onblur = () => setTimeout(() => searching(false), 150)
+  search.onkeydown = e => { if (e.key === 'Escape') { search.value = ''; search.blur() } }
 
   // map interactions
   const tip = $('tooltip')
