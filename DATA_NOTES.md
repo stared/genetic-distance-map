@@ -27,7 +27,7 @@ Only the two **No Sims** sheets are present locally (no simulated coordinates, n
 
 The sums are slightly below the announced totals, consistent with sims having been removed (13,533 → 13,479 ancients, 26,752 → 23,107 moderns, so most sims were in the modern sheet).
 
-Obtained 2025-09-04 from the Drive files linked in the thread (saved as plain text). Files are not committed to git yet (`data/` is untracked).
+Obtained 2025-09-04 from the Drive files linked in the thread (saved as plain text). Both sheets are committed in `data/`.
 
 ### Global25 (upstream coordinate system)
 

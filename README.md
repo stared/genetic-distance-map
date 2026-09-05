@@ -1,4 +1,4 @@
-# gp25 — Global25 population map
+# Genetic Similarity Map
 
 Interactive map of ~6,000 population averages (3,940 ancient, 2,080 modern) from the
 [Moriopoulos Collection 2025](https://genarchivist.net/showthread.php?tid=1449) (no sims)
