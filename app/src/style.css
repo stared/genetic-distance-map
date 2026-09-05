@@ -129,6 +129,7 @@ a { color: var(--accent); text-decoration: none; }
   footer .narrow { display: inline; }
   #legend { left: 10px; right: 10px; bottom: 10px; width: auto; padding: 8px 10px 6px; }
   #legend .lt { font-size: 11px; }
+  #legend .to { display: none; }
   #tooltip { display: none !important; }
   body.searching #map, body.searching #query, body.searching #nearest { display: none; }
 }
