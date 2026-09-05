@@ -1,4 +1,4 @@
-# Genetic Distance Maps based on G25
+# Genetic Distance Map based on G25
 
 **Live: [p.migdal.pl/genetic-distance-map](https://p.migdal.pl/genetic-distance-map/).** Pick a population, present-day or ancient, and see which present-day populations are genetically closest, on a map.
 
