@@ -62,7 +62,7 @@ async function main() {
     const top = sorted.slice(0, 80)
     const groups = new Map<string, Pop[]>(); top.forEach(p => { const g = groups.get(p.first); g ? g.push(p) : groups.set(p.first, [p]) })
     const closest = [...groups.values()].filter(m => raw[m[0].id] > 0).slice(0, 3).map(m => `${esc(disp(m[0].first))} <i>${raw[m[0].id].toFixed(1)}</i>`).join(', ')
-    $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="meta">${query.meta}</div><div class="closest">Closest: ${closest}</div>`   // the closest line shows only on phones, as a hint that the list unfolds
+    $('query').innerHTML = `<div class="name">${esc(query.name)}</div><div class="meta">${query.meta}</div><div class="closest">Closest: ${closest}</div><div class="fold"><span class="more">More</span><span class="less">Less</span></div>`   // the closest line shows only on phones, as a hint that the list unfolds
     const list = $('nearest'); list.innerHTML = ''
     for (const [first, mem] of groups) {
       const best = mem[0]
