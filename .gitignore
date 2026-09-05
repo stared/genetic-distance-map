@@ -4,3 +4,4 @@ analysis/*.parquet
 analysis/*.npy
 app/node_modules/
 app/dist/
+app/chrome-profile/
