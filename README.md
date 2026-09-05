@@ -31,11 +31,14 @@ never drawn). Ancient samples are available only as similarity queries through t
   clusters.
 
 Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
-wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each cell holds its 6
-nearest shown locations (k-d tree on the sphere) with inverse-distance weights and a fade between
-800 and 1600 km from the nearest sample. Coastlines are stroked into the raster land mask so
-islands smaller than a cell are still painted. The raster is drawn with the map transform and
-clipped to the vector coastline. The app opens on a default query.
+wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each land cell holds its 6
+nearest shown locations by distance **over land** (multi-source shortest path on the land raster, Dial's
+algorithm), with inverse-distance weights, so colour follows coasts and islands and never crosses water.
+Land with no land route to any sample (Greenland, unsampled islands) takes the nearest samples by
+great-circle distance instead, so nothing is left grey; Antarctica is the one exception and stays
+unpainted. Coastlines are stroked into the raster land mask so islands smaller than a cell are still
+painted. The raster is drawn with the map transform and clipped to the vector coastline. The app opens
+on a default query.
 
 Shareable URLs: the address bar always reflects the current state, e.g.
 `?q=Polish&scale=close&map=15.00,48.00,1400`, `?q=Russia_Samara_EBA_Yamnaya`, `?view=clusters&open=3683,3682&focus=3682`

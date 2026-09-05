@@ -5,7 +5,7 @@ import type { Pop } from './types'
 export const W = 1024, H = 1024
 const SCALE = W / (2 * Math.PI)
 export const LAT_MAX = (2 * Math.atan(Math.exp((H / 2) / SCALE)) - Math.PI / 2) * 180 / Math.PI // ≈85.05°
-const K = 6, FADE_KM = 800, MAX_KM = 1600
+const K = 6, LAND_MAX_KM = 6000, BUCKET_KM = 4
 /** colour ramp: t=0 close (red) … t=1 far (blue), fully saturated, no grey */
 export const ramp = (t: number) => interpolateTurbo(0.93 - 0.85 * t)
 
@@ -51,7 +51,8 @@ export interface Field { idx: Int32Array; wgt: Float32Array; fade: Uint8Array }
 
 /** Land raster + unique sample locations; neighbour fields are built lazily per subset (present-day / ancient). */
 export class HeatGrid {
-  land = new Uint8Array(W * H)
+  land = new Uint8Array(W * H)          // painted land (coast dilated by 2 cells)
+  core = new Uint8Array(W * H)          // land proper, used for over-land distances
   private locXYZ!: { X: Float64Array; Y: Float64Array; Z: Float64Array }
   locPops: number[][] = []              // location -> pop ids
   private locVal: Float32Array
@@ -82,8 +83,8 @@ export class HeatGrid {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()   // islands smaller than a cell still register as land
     const land0 = ctx.getImageData(0, 0, W, H).data
     ctx.clearRect(0, 0, W, H)
-    const land = this.land
-    for (let i = 0; i < W * H; i++) if (land0[i * 4] >= 128) { const r = (i / W) | 0, c = i % W; for (let dy = -2; dy <= 2; dy++) { const rr = r + dy; if (rr < 0 || rr >= H) continue; for (let dx = -2; dx <= 2; dx++) land[rr * W + ((c + dx + W) % W)] = 1 } }
+    const land = this.land, core = this.core
+    for (let i = 0; i < W * H; i++) if (land0[i * 4] >= 128) { core[i] = 1; const r = (i / W) | 0, c = i % W; for (let dy = -2; dy <= 2; dy++) { const rr = r + dy; if (rr < 0 || rr >= H) continue; for (let dx = -2; dx <= 2; dx++) land[rr * W + ((c + dx + W) % W)] = 1 } }
     // unique locations
     const locOf = new Map<string, number>(); const lat: number[] = [], lon: number[] = []
     for (const p of pops) {
@@ -99,7 +100,9 @@ export class HeatGrid {
     for (let i = 0; i < n; i++) { X[i] = Math.cos(lat[i]) * Math.cos(lon[i]); Y[i] = Math.cos(lat[i]) * Math.sin(lon[i]); Z[i] = Math.sin(lat[i]) }
     this.locXYZ = { X, Y, Z }
   }
-  /** neighbour field over the locations passing `keep` (cached by key) */
+  /** neighbour field over the locations passing `keep` (cached by key): for every land cell its K nearest
+   *  locations by distance OVER LAND (multi-source shortest path on the land raster, so influence follows coasts
+   *  and never crosses water); cells with no land route to any location fall back to great-circle distance. */
   field(key: string, keep: (li: number) => boolean): Field {
     const cached = this.fields.get(key); if (cached) return cached
     const { X, Y, Z } = this.locXYZ
@@ -107,20 +110,56 @@ export class HeatGrid {
     const f: Field = { idx: new Int32Array(W * H * K).fill(-1), wgt: new Float32Array(W * H * K), fade: new Uint8Array(W * H) }
     this.fields.set(key, f)
     if (!sel.length) return f
+    const cnt = new Uint8Array(W * H), dist = new Float32Array(W * H * K)
+    // km per cell at each row (Mercator: same in x and y)
+    const kmRow = new Float32Array(H)
+    for (let r = 0; r < H; r++) { const cl = 2 * Math.atan(Math.exp((H / 2 - (r + 0.5)) / SCALE)) - Math.PI / 2; kmRow[r] = 2 * Math.PI * 6371 / W * Math.cos(cl) }
+    // Dial's algorithm: buckets of BUCKET_KM; entries (cell, source) with the distance implied by the bucket
+    const NB = Math.ceil(LAND_MAX_KM / BUCKET_KM) + 1
+    const bCell: number[][] = Array.from({ length: NB }, () => []), bSrc: number[][] = Array.from({ length: NB }, () => [])
+    const push = (d: number, cell: number, src: number) => { const b = Math.round(d / BUCKET_KM); if (b < NB) { bCell[b].push(cell); bSrc[b].push(src) } }
+    // seed: each location at its land cell (snapped to the nearest land cell within 3 cells if it falls in water)
+    for (let s = 0; s < sel.length; s++) {
+      const li = sel[s], lat = Math.asin(Z[li]) * 180 / Math.PI, lon = Math.atan2(Y[li], X[li]) * 180 / Math.PI
+      const [px, py] = project(lon, lat); let c = Math.floor(px) % W, r = Math.max(0, Math.min(H - 1, Math.floor(py)))
+      if (!this.core[r * W + c]) { let best = -1, bd = 99; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const rr = r + dy, cc = (c + dx + W) % W; if (rr < 0 || rr >= H || !this.core[rr * W + cc]) continue; const d = dx * dx + dy * dy; if (d < bd) { bd = d; best = rr * W + cc } } if (best < 0) continue; r = (best / W) | 0; c = best % W }
+      push(0, r * W + c, li)
+    }
+    const has = (cell: number, src: number) => { for (let j = 0; j < cnt[cell]; j++) if (f.idx[cell * K + j] === src) return true; return false }
+    for (let b = 0; b < NB; b++) {
+      const cells = bCell[b], srcs = bSrc[b], d = b * BUCKET_KM
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i], src = srcs[i]
+        if (cnt[cell] >= K || has(cell, src)) continue
+        const j = cnt[cell]++; f.idx[cell * K + j] = src; dist[cell * K + j] = d
+        const r = (cell / W) | 0, c = cell % W, step = kmRow[r]
+        for (let dy = -1; dy <= 1; dy++) { const rr = r + dy; if (rr < 0 || rr >= H) continue
+          for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const n = rr * W + ((c + dx + W) % W); if (this.core[n] && cnt[n] < K) push(d + (dx && dy ? step * Math.SQRT2 : step), n, src) } }
+      }
+      bCell[b] = []; bSrc[b] = []
+    }
+    // dilated coast cells take their nearest core neighbour's entries
+    for (let pass = 0; pass < 2; pass++) for (let cell = 0; cell < W * H; cell++) {
+      if (!this.land[cell] || cnt[cell]) continue
+      const r = (cell / W) | 0, c = cell % W
+      for (let dy = -1; dy <= 1 && !cnt[cell]; dy++) for (let dx = -1; dx <= 1; dx++) { const rr = r + dy; if (rr < 0 || rr >= H) continue; const n = rr * W + ((c + dx + W) % W); if (cnt[n]) { cnt[cell] = cnt[n]; for (let j = 0; j < K; j++) { f.idx[cell * K + j] = f.idx[n * K + j]; dist[cell * K + j] = dist[n * K + j] + kmRow[r] } break } }
+    }
+    // no land route: spill from the nearest locations by great-circle distance
     const kd = new KD(Float64Array.from(sel, i => X[i]), Float64Array.from(sel, i => Y[i]), Float64Array.from(sel, i => Z[i]))
     const outI = new Int32Array(K), outD = new Float64Array(K)
     const chordToKm = (c2: number) => 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(c2) / 2))
     for (let r = 0; r < H; r++) {
       const cl = 2 * Math.atan(Math.exp((H / 2 - (r + 0.5)) / SCALE)) - Math.PI / 2, cosl = Math.cos(cl), sinl = Math.sin(cl)
       for (let cix = 0; cix < W; cix++) {
-        const cell = r * W + cix; if (!this.land[cell]) continue
+        const cell = r * W + cix; if (!this.land[cell] || cnt[cell]) continue
         const clon = (-180 + (cix + 0.5) * 360 / W) * Math.PI / 180
         const m = kd.query(cosl * Math.cos(clon), cosl * Math.sin(clon), sinl, K, outI, outD)
-        const near = chordToKm(outD[0]); if (near > MAX_KM) continue
-        f.fade[cell] = near < FADE_KM ? 255 : Math.round(255 * (1 - (near - FADE_KM) / (MAX_KM - FADE_KM)))
-        for (let j = 0; j < m; j++) { const km = chordToKm(outD[j]); f.idx[cell * K + j] = sel[outI[j]]; f.wgt[cell * K + j] = 1 / ((km + 40) ** 2) }
+        for (let j = 0; j < m; j++) { f.idx[cell * K + j] = sel[outI[j]]; dist[cell * K + j] = chordToKm(outD[j]) }
+        cnt[cell] = m
       }
     }
+    const rowAntarctica = project(0, -60)[1]   // nobody lives there: leave it unpainted rather than spill onto it
+    for (let cell = 0; cell < W * H; cell++) { if (!cnt[cell] || cell / W >= rowAntarctica) continue; f.fade[cell] = 255; for (let j = 0; j < cnt[cell]; j++) f.wgt[cell * K + j] = 1 / ((dist[cell * K + j] + 40) ** 2) }
     return f
   }
   /** similarity: per-pop distances (×100), averaged over visible pops at each location, IDW-blended over K neighbours */
