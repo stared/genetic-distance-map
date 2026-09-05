@@ -1,4 +1,4 @@
-# Genetic Similarity Map
+# Genetic Distance Maps based on G25
 
 **Live: TODO.** Pick a population, present-day or ancient, and see which present-day populations are genetically closest, on a map.
 
