@@ -71,6 +71,7 @@ async function main() {
       const subs = all.map((p, i) => `<span data-id="${p.id}" title="${esc(p.label)}"${i >= cap ? ' hidden' : ''}>${esc(subOf(p))} <i>${raw[p.id].toFixed(1)}</i></span>`).join('') + (cap < all.length ? `<button class="more">+${all.length - cap} more</button>` : '')
       g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], span)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${raw[best.id].toFixed(1)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
       g.addEventListener('click', e => {
+        if (getSelection()?.toString()) return                       // a click that ends a text selection is not a pick
         const el = e.target as HTMLElement
         if (el.classList.contains('more')) { g.querySelectorAll<HTMLElement>('.subs [hidden]').forEach(s => s.hidden = false); el.remove(); return }
         const t = el.closest('[data-id]') as HTMLElement | null; selectPop(byId.get(t ? +t.dataset.id! : best.id)!, true) })
@@ -182,7 +183,7 @@ async function main() {
     if (m === 'clu') { cutTo(K_DEFAULT); focus = tree.root; setMode(m); zoomTo(tree.root) }   // the tab always opens the world in 8 clusters
     else setMode(m)
   })
-  $('query').onclick = () => { if (matchMedia('(max-width: 700px)').matches) document.body.classList.toggle('list-open') }   // phones: the selected row folds the list
+  $('query').onclick = () => { if (matchMedia('(max-width: 700px)').matches && !getSelection()?.toString()) document.body.classList.toggle('list-open') }   // phones: the selected row folds the list
   const rangeEl = $<HTMLSelectElement>('range'); rangeEl.onchange = () => { rangeQ = +rangeEl.value; renderSim() }
 
   // search

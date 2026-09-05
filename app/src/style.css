@@ -35,12 +35,12 @@ a { color: var(--accent); text-decoration: none; }
 #suggest li { padding: 6px 8px; margin: 0 -8px; border-radius: 5px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
 #suggest li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #suggest li:hover { background: var(--hover); }
-#suggest li.hd { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; cursor: default; padding-top: 12px; }
+#suggest li.hd { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; cursor: default; padding-top: 12px; }
 #suggest li.hd:first-child { padding-top: 0; }
 #suggest li.hd:hover { background: none; }
 #suggest li.empty { color: var(--muted); cursor: default; }
 #suggest li.empty:hover { background: none; }
-#suggest .sub { margin-left: auto; color: var(--faint); }
+#suggest .sub { margin-left: auto; color: var(--muted); font-family: var(--mono); font-size: 12px; }
 
 .query { text-align: center; }
 .query .name { font-weight: 600; font-size: 16px; }
@@ -48,13 +48,14 @@ a { color: var(--accent); text-decoration: none; }
 .query .closest, .query .fold { display: none; }
 .query .loc { display: inline-flex; align-items: center; gap: 4px; }
 .query .loc svg { width: 13px; height: 13px; flex: none; }
-.n { color: var(--faint); }
+.n { color: var(--muted); }
 #legend { position: absolute; right: 16px; bottom: 16px; width: 300px; padding: 10px 12px 8px; background: rgba(0, 0, 0, .82); border-radius: 6px; }
 #legend .lt { color: var(--muted); font-size: 12px; margin-bottom: 5px; line-height: 1.6; }
 #legend select { font: inherit; color: var(--fg); background: #131316; border: 0; border-radius: 4px; padding: 1px 6px; cursor: pointer; appearance: none; -webkit-appearance: none; }
 #legend .lt b { color: var(--fg); font-weight: 600; }
+#legend .sc { white-space: nowrap; }   /* the scale phrase wraps as one unit, never leaving the select alone on a line */
 .ramp { width: 100%; height: 8px; border-radius: 4px; }
-#legend .lx { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--fg); }
+#legend .lx { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
 #legend .lx .ramp { flex: 1; }
 #legend .lx span { width: 34px; flex: none; }
 #legend .lx span:first-child { text-align: right; }
@@ -76,8 +77,8 @@ a { color: var(--accent); text-decoration: none; }
 .sw.a { border-radius: 0; transform: rotate(45deg); width: 8px; height: 8px; }
 .grp .subs { margin: 3px 0 0 17px; color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 1px 12px; }
 .grp .subs span:hover { color: var(--fg); }
-.grp .subs i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--faint); }
-.grp .more { font: inherit; color: var(--faint); background: none; border: 0; padding: 0; cursor: pointer; }
+.grp .subs i { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--faint); }   /* a score inside a grey line sits one step dimmer than its name */
+.grp .more { font: inherit; color: var(--muted); background: none; border: 0; padding: 0; cursor: pointer; }
 .grp .more:hover { color: var(--fg); }
 
 .tlist { position: relative; margin: 0 -6px; }
@@ -118,7 +119,7 @@ a { color: var(--accent); text-decoration: none; }
   body.list-open #map { flex: none; height: 36vh; height: 36dvh; }
   #query { order: 3; position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); cursor: pointer; text-align: left; }
   .query .closest { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
-  .query .closest i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .query .closest i { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--faint); }
   .query .fold { display: flex; align-items: center; gap: 5px; margin-left: auto; color: var(--muted); font-size: 12px; }
   .query .fold::after { content: ""; width: 6px; height: 6px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg); }
   .query .less { display: none; }
@@ -129,11 +130,10 @@ a { color: var(--accent); text-decoration: none; }
   body.list-open .query .fold::after { transform: translateY(2px) rotate(225deg); width: 8px; height: 8px; }
   #nearest { order: 4; display: none; }
   body.list-open #nearest { display: flex; flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px; border-top: 1px solid var(--line); }
-  footer { order: 5; padding: 6px 10px; font-size: 11px; line-height: 1.4; }
+  footer { order: 5; padding: 6px 10px; line-height: 1.4; }
   footer .wide { display: none; }
   footer .narrow { display: inline; }
   #legend { left: 10px; right: 10px; bottom: 10px; width: auto; padding: 8px 10px 6px; }
-  #legend .lt { font-size: 11px; }
   .query .name, .query .meta { display: none; }   /* the legend already names the population; the row is the closest line only */
   #tooltip { display: none !important; }
   body.searching #map, body.searching #query, body.searching #nearest { display: none; }
