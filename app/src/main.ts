@@ -213,13 +213,13 @@ async function main() {
   for (const e of ERAS) starters[e] = ancientBy(e).slice(0, 4).map(rowOf)
   const HEAD: Record<string, string> = { pick: 'Top picks', m: 'Present-day', ...ERA }
   // while searching, the suggestions take over the panel below the box
-  const searching = (on: boolean) => { suggest.hidden = !on; $('query').hidden = on; $('nearest').hidden = on }
+  const searching = (on: boolean) => { suggest.hidden = !on; $('query').hidden = on; $('nearest').hidden = on; document.body.classList.toggle('searching', on) }   // phones: the map hides while searching
   function showSuggest(groups: Groups) {
     suggest.innerHTML = ''; let any = false
     for (const key of ['pick', 'm', 'pre', 'anc', 'med', 'mod'] as const) {
       const list = groups[key]; if (!list?.length) continue; any = true
       const hd = document.createElement('li'); hd.className = 'hd'; hd.textContent = HEAD[key]; suggest.appendChild(hd)
-      for (const r of list) { const li = document.createElement('li'); li.innerHTML = `<span>${esc(r.name)}</span><span class="sub">n=${r.n}</span>`; li.onmousedown = () => { search.value = ''; searching(false); selectPop(r.p, true) }; suggest.appendChild(li) }
+      for (const r of list) { const li = document.createElement('li'); li.innerHTML = `<span>${esc(r.name)}</span><span class="sub">n=${r.n}</span>`; li.onpointerdown = () => { search.value = ''; searching(false); selectPop(r.p, true) }; suggest.appendChild(li) }
     }
     if (!any) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'No population matches'; suggest.appendChild(li) }
     searching(true)

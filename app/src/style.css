@@ -7,7 +7,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); }
-#app { display: flex; height: 100vh; }
+#app { display: flex; height: 100vh; height: 100dvh; }
 #panel { width: 380px; min-width: 320px; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--bg); overflow: hidden; }
 #panel header { display: flex; flex-direction: column; }
 #panel h1 { margin: 0; padding: 14px 16px 0; font-size: 18px; font-weight: 600; line-height: 1.2; }
@@ -104,3 +104,17 @@ a { color: var(--accent); text-decoration: none; }
 
 #tooltip { position: absolute; pointer-events: none; z-index: 10; background: #000; border: 1px solid #3f3f46; color: var(--fg); padding: 6px 9px; border-radius: 6px; font-size: 12px; max-width: 320px; }
 #tooltip .sub { color: var(--muted); }
+
+/* phones: map on top, panel below */
+@media (max-width: 700px) {
+  #app { flex-direction: column; }
+  #map { flex: none; height: 46vh; height: 46dvh; order: -1; border-bottom: 1px solid var(--line); }
+  #panel { width: auto; min-width: 0; flex: 1; min-height: 0; border-right: 0; }
+  #panel h1 { padding: 10px 14px 0; font-size: 16px; }
+  .mode { padding: 10px 14px; gap: 10px; }
+  footer { padding: 8px 14px; font-size: 11px; line-height: 1.5; }
+  #legend { left: 10px; right: 10px; bottom: 10px; width: auto; padding: 8px 10px 6px; }
+  #legend .lt { font-size: 11px; }
+  #tooltip { display: none !important; }
+  body.searching #map { display: none; }
+}

@@ -28,27 +28,52 @@ export class FlatMap {
     this.screen = new Float32Array(pops.length * 2)
     new ResizeObserver(() => this.resize()).observe(container)
     this.resize(); this.k = this.minK(); this.tx = this.w / 2; this.ty = this.h / 2
-    this.canvas.addEventListener('mousedown', e => { this.dragging = true; this.moved = false; this.anim = null; this.last = [e.clientX, e.clientY] })
-    window.addEventListener('mouseup', e => { if (!this.dragging) return; this.dragging = false; if (!this.moved) this.click(e) })
-    window.addEventListener('mousemove', e => {
-      if (this.dragging) {
+    // pointer events: mouse and touch share one path; two touch pointers pinch-zoom
+    const ptrs = new Map<number, [number, number]>()
+    let pinch: { d: number; mid: [number, number] } | null = null
+    const c = this.canvas; c.style.touchAction = 'none'
+    c.addEventListener('pointerdown', e => {
+      ptrs.set(e.pointerId, [e.clientX, e.clientY]); try { c.setPointerCapture(e.pointerId) } catch {} ; this.anim = null
+      if (ptrs.size === 1) { this.dragging = true; this.moved = false; this.last = [e.clientX, e.clientY] }
+      else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] }; this.moved = true }
+    })
+    c.addEventListener('pointermove', e => {
+      if (!ptrs.has(e.pointerId)) { if (e.pointerType === 'mouse') this.hover(e); return }
+      ptrs.set(e.pointerId, [e.clientX, e.clientY])
+      if (ptrs.size >= 2 && pinch) {
+        const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]), mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]
+        const r = c.getBoundingClientRect()
+        this.tx += mid[0] - pinch.mid[0]; this.ty += mid[1] - pinch.mid[1]
+        if (pinch.d > 0) this.zoomAt(mid[0] - r.left, mid[1] - r.top, d / pinch.d); else { this.clamp(); this.request() }
+        pinch = { d, mid }
+      } else if (this.dragging) {
         const dx = e.clientX - this.last[0], dy = e.clientY - this.last[1]; this.last = [e.clientX, e.clientY]
         if (Math.abs(dx) + Math.abs(dy) > 2) this.moved = true
         this.tx += dx; this.ty += dy; this.clamp(); this.request()
-      } else this.hover(e)
+      }
     })
-    this.canvas.addEventListener('wheel', e => { e.preventDefault(); this.zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015)) }, { passive: false })
-    this.canvas.addEventListener('mouseleave', () => this.onHover(null, 0, 0))
+    const up = (e: PointerEvent) => {
+      if (!ptrs.delete(e.pointerId)) return
+      if (ptrs.size === 1) { pinch = null; const [rest] = [...ptrs.values()]; this.last = rest; this.moved = true }
+      if (ptrs.size === 0) { const tap = this.dragging && !this.moved; this.dragging = false; pinch = null; if (tap && e.type === 'pointerup') this.click(e) }
+    }
+    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up)
+    c.addEventListener('wheel', e => { e.preventDefault(); this.zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015)) }, { passive: false })
+    c.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') this.onHover(null, 0, 0) })
   }
   private minK() { return Math.max(this.w, this.h * 0.6) / (2 * Math.PI) }
+  /** clamp a scale to [world fits, 200× that]; before the container has a size nothing is known, so leave it alone */
+  private clampK(k: number) { return this.w < 2 ? k : Math.max(this.minK(), Math.min(this.minK() * 200, k)) }
   resize() {
     const box = this.canvas.parentElement!.getBoundingClientRect()
+    if (box.width < 2 || box.height < 2) return                        // hidden (display: none): keep the view for when it comes back
     this.w = Math.max(1, Math.floor(box.width)); this.h = Math.max(1, Math.floor(box.height)); this.dpr = window.devicePixelRatio || 1
     this.canvas.width = this.w * this.dpr; this.canvas.height = this.h * this.dpr; this.canvas.style.width = this.w + 'px'; this.canvas.style.height = this.h + 'px'
     this.clamp(); this.request()
   }
   private clamp() {
-    this.k = Math.max(this.minK(), Math.min(this.minK() * 200, this.k))
+    this.k = this.clampK(this.k)
+    if (this.w < 2) return
     const half = Math.PI * this.k
     // wrap horizontally (continuous panning), clamp vertically to the poles
     const ww = 2 * half, c = this.w / 2
@@ -62,12 +87,12 @@ export class FlatMap {
   view(): { lon: number; lat: number; k: number } { const g = geoMercator().scale(this.k).translate([this.tx, this.ty]).invert!([this.w / 2, this.h / 2])!; return { lon: ((g[0] + 540) % 360) - 180, lat: g[1], k: this.k } }
   invert(x: number, y: number): [number, number] | null { const g = this.proj.invert!([x, y]); return g && Math.abs(g[1]) <= LAT_MAX ? [((g[0] + 540) % 360) - 180, g[1]] : null }
   zoomAt(x: number, y: number, f: number) {
-    const k0 = this.k; this.k = Math.max(this.minK(), Math.min(this.minK() * 200, this.k * f)); f = this.k / k0
+    const k0 = this.k; this.k = this.clampK(this.k * f); f = this.k / k0
     this.tx = x - (x - this.tx) * f; this.ty = y - (y - this.ty) * f; this.clamp(); this.request()
   }
   /** animate so that (lon,lat) is centred at scale k (css px per radian) */
   flyTo(lon: number, lat: number, k: number, dur = 600) {
-    k = Math.max(this.minK(), Math.min(this.minK() * 200, k))
+    k = this.clampK(k)
     const p = geoMercator().scale(k).translate([0, 0])([lon, lat])!
     if (dur <= 0) { this.anim = null; this.k = k; this.tx = this.w / 2 - p[0]; this.ty = this.h / 2 - p[1]; this.clamp(); this.request(); return }
     this.anim = { t0: performance.now(), dur, from: [this.k, this.tx, this.ty], to: [k, this.w / 2 - p[0], this.h / 2 - p[1]] }
@@ -83,13 +108,13 @@ export class FlatMap {
     const c = m.invert!([(x0 + x1) / 2, (y0 + y1) / 2])!
     this.flyTo(c[0], c[1], k)
   }
-  private popAt(x: number, y: number): Pop | null {
-    let best: Pop | null = null, bd = 64
+  private popAt(x: number, y: number, radius = 8): Pop | null {
+    let best: Pop | null = null, bd = radius * radius
     for (const p of this.pops) { const sx = this.screen[p.id * 2]; if (sx !== sx) continue; const sy = this.screen[p.id * 2 + 1]; const dd = (sx - x) ** 2 + (sy - y) ** 2; if (dd < bd) { bd = dd; best = p } }
     return best
   }
-  private hover(e: MouseEvent) { const r = this.canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const p = this.popAt(x, y); this.canvas.style.cursor = p ? 'pointer' : 'grab'; this.onHover(p, x, y) }
-  private click(e: MouseEvent) { const r = this.canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const p = this.popAt(x, y); const g = this.invert(x, y); if (p) this.onClick(p.lon!, p.lat!, p); else if (g) this.onClick(g[0], g[1], null) }
+  private hover(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const p = this.popAt(x, y); this.canvas.style.cursor = p ? 'pointer' : 'grab'; this.onHover(p, x, y) }
+  private click(e: PointerEvent) { const r = this.canvas.getBoundingClientRect(); const x = e.clientX - r.left, y = e.clientY - r.top; const p = this.popAt(x, y, e.pointerType === 'touch' ? 22 : 8) /* a fingertip needs a bigger target */; const g = this.invert(x, y); if (p) this.onClick(p.lon!, p.lat!, p); else if (g) this.onClick(g[0], g[1], null) }
 
   render() {
     if (this.anim) {
