@@ -1,69 +1,33 @@
 # Genetic Similarity Map
 
-Interactive map of ~6,000 population averages (3,940 ancient, 2,080 modern) from the
-[Moriopoulos Collection 2025](https://genarchivist.net/showthread.php?tid=1449) (no sims)
-on Eurogenes Global25 coordinates. See `DATA_NOTES.md` for sources and conventions and
-`ANALYSIS.md` for the sanity checks behind the design.
+**Live: TODO** · Pick a population, present-day or ancient, and see which present-day populations are genetically closest, on a map.
 
-## Views
+## What you are looking at
 
-The map always shows present-day populations (outliers, low-resolution and contaminated entries are
-never drawn). Ancient samples are available only as similarity queries through the search box.
+- **Data**: [Moriopoulos Collection 2025](https://genarchivist.net/showthread.php?tid=1449), a hobbyist-curated set of 6,020 population averages (2,080 present-day, 3,940 ancient) built from ~37,000 individual genomes. Not peer-reviewed, no formal licence, freely shared for educational use.
+- **Coordinates**: [Global25](https://eurogenes.blogspot.com/2019/07/getting-most-out-of-global25_12.html) (G25), a 25-dimensional PCA of human genetic variation maintained by Davidski (Eurogenes). Each population is a point in that space. The axes are scaled so that the first two, which separate Africa, West Eurasia and East Asia, dominate; within a region the fine structure lives in dimensions 3 to 10.
+- **Distance**: plain Euclidean distance between the 25-dimensional points, times 100, the convention of the G25 community. Polish to Ukrainian is about 1, English to Welsh 0.4, Europe to East Asia 40 and more. It measures similarity of population averages. It is not ancestry share, not a family tree, and says nothing about individuals.
+- **Clusters**: Ward hierarchical clustering of the present-day populations on the same coordinates. Every split in the panel is a real branch of that tree; the map is coloured by the cluster of the nearest sampled location. Admixed groups sit on long branches between clades, which is a limit of trees, not a fact about history.
+- **Locations** were assigned to the text labels by a language model (site, region, or ethnic homeland; 575 of 4,453 marked as guesses). They are approximate. Sanity check: the geographic distance to each population's genetic nearest neighbour has a median of 405 km.
+- **The colour between dots is decorative.** It is inverse-distance interpolation over land, computed along land so it follows coasts and never crosses water. It shows nothing that the dots don't.
 
-- **Similarity**: click a dot or search a population (present-day or ancient). Every present-day
-  population is coloured by its G25 distance to the query (Euclidean on scaled coordinates, ×100 as
-  in Vahaduo) and an inverse-distance-weighted heatmap is drawn over land. The colour scale runs from
-  the nearest population to the 25th-percentile distance by default and the upper bound is editable.
-  The list is the ranked nearest populations grouped by ethnonym. While searching, the results take over
-  the panel: curated top picks (Mycenaean Greece, Imperial Rome, Vikings, Yamnaya…), the most-sampled
-  present-day groups (represented by their medoid entry), and the largest samples of each era. Era words
-  (prehistoric, ancient, medieval, early modern) are searchable, and words combine ("medieval poland").
-- **Clusters**: Ward hierarchical clustering of present-day populations. The map is coloured
-  Voronoi-style by the cluster of the nearest sampled location, with hierarchical hues (nearby hues are
-  nearby branches). The panel is a dendrogram of the selected branch: one aligned row per cluster with
-  ⊕ (split in two), swatch and name; ⊖ junctions between them (merge back) sit left in proportion to the
-  square root of Ward distance. Above it two rows: the branch one level up (muted, click to go there) and
-  the selected branch (bold, with its own ⊕/⊖). Clicking a cluster row or a region on the map selects it:
-  the map zooms to it, its clusters take the whole hue circle and everything else goes grey; a second
-  click on the region splits it. Hovering a row highlights that cluster's dots; the browser Back button
-  undoes any step. Branches are named by the areas they hold most of (continents when they own them,
-  subregions otherwise, derived from coordinates in `app/src/regions.ts`). It opens with the world in 8
-  clusters.
+## Caveats worth knowing
 
-Rendering: a flat Web-Mercator map on a 2D canvas with d3-geo (drag to pan with horizontal wrap,
-wheel to zoom, no map library). Values live on a 1024×1024 Mercator raster; each land cell holds its 6
-nearest shown locations by distance **over land** (multi-source shortest path on the land raster, Dial's
-algorithm), with inverse-distance weights, so colour follows coasts and islands and never crosses water.
-Land with no land route to any sample (Greenland, unsampled islands) takes the nearest samples by
-great-circle distance instead, so nothing is left grey; Antarctica is the one exception and stays
-unpainted. Coastlines are stroked into the raster land mask so islands smaller than a cell are still
-painted. The raster is drawn with the map transform and clipped to the vector coastline. The app opens
-on a default query.
+- 21% of present-day and 54% of ancient averages are a single individual. Outliers, low-resolution and contaminated entries are excluded from the map but reachable by search.
+- Many present-day samples are consumer-test customers with self-reported ethnicity.
+- G25 projection of low-coverage ancient samples is biased towards the centre. Ancient distances are less trustworthy than present-day ones.
+- Better sources exist for rigour ([AADR](https://dataverse.harvard.edu/dataverse/reich_lab), HGDP, Human Origins) but none with 2,000 named present-day groups.
 
-Shareable URLs: the address bar always reflects the current state, e.g.
-`?q=Polish&scale=close&map=15.00,48.00,1400`, `?q=Russia_Samara_EBA_Yamnaya`, `?view=clusters&open=3683,3682&focus=3682`
-(`map` is centre longitude, latitude and Mercator scale; `scale` is close, regional or global; `open` lists the
-tree nodes that are split and `focus` the branch in view).
+Details: [DATA_NOTES.md](DATA_NOTES.md) (sources, scaling, geocoding), [ANALYSIS.md](ANALYSIS.md) (why Ward, what the tree agrees with).
 
 ## Run
 
 ```sh
 cd app && pnpm install && pnpm dev      # http://localhost:5173
 pnpm build                              # static site in app/dist
+uv run --with pandas --with numpy --with scipy python analysis/build_data.py   # rebuild data
 ```
 
-## Rebuild data
+Vite + TypeScript, d3-geo Mercator on a 2D canvas, no map library. Distances are computed in the browser from the 25 coordinates. The panel state and map position live in the URL, so any view is shareable and the Back button undoes steps.
 
-```sh
-uv run --with pandas --with numpy --with scipy python analysis/build_data.py
-```
-
-Reads `data/*.txt` and `data/geo/chunks/*.csv`, writes `app/public/data/pops.json` and `trees.json`,
-plus `data/geo/geocoded.csv` (merged gazetteer) and `data/geo/suspicious_far_nn.csv` (populations whose
-genetic nearest neighbour is > 4,000 km away, for geocoding review).
-
-## Layout
-
-- `data/` raw sheets and geocoding (`geo/GEOCODING_INSTRUCTIONS.md`, `geo/chunks/*.csv`)
-- `analysis/` exploration scripts and the data build script
-- `app/` Vite + TypeScript app (d3-geo Mercator map on canvas)
+Data viz by [Piotr Migdał](https://p.migdal.pl), 2026. Data by Michalis Moriakos; Global25 by David Wesolowski. Corrections welcome as issues.
