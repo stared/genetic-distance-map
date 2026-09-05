@@ -1,6 +1,6 @@
 # Genetic Similarity Map
 
-**Live: TODO** · Pick a population, present-day or ancient, and see which present-day populations are genetically closest, on a map.
+**Live: TODO.** Pick a population, present-day or ancient, and see which present-day populations are genetically closest, on a map.
 
 ## What you are looking at
 
