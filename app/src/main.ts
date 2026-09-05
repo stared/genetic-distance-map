@@ -11,7 +11,7 @@ type Mode = 'sim' | 'clu'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const disp = (s: string) => s.replace(/_/g, ' ')
 const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]!))
-const DEFAULT_QUERY = 'Polish'
+const DEFAULT_QUERY = 'Italy_Lazio_Roman_Empire_Rome'
 
 async function main() {
   const [pops, treesRaw, world] = await Promise.all([
@@ -43,7 +43,7 @@ async function main() {
   const meta = (p: Pop) => `<span class="loc">${PIN}${esc(p.place ?? 'no location')}</span>` + tags(p).map(t => `<span>${t}</span>`).join('')
 
   // ---------- similarity
-  let query: { name: string; core: string; meta: string; c: number[] } | null = null
+  let query: { name: string; core: string; profile: string; meta: string; c: number[] } | null = null
   const d = new Float32Array(pops.length), raw = new Float32Array(pops.length)
   let d0 = 0                                   // colour scale runs from d0 (nearest shown population) to dmax
   const dminEl = $('dmin'), dmaxV = $('dmaxv'), legend = $('legend')
@@ -80,7 +80,7 @@ async function main() {
     syncUrl()
   }
   function selectPop(p: Pop, fly: boolean) {
-    query = { name: disp(p.core), core: p.core, meta: meta(p), c: p.c }
+    query = { name: disp(p.core), core: p.core, profile: p.profile, meta: meta(p), c: p.c }
     if (mode !== 'sim') setMode('sim'); else renderSim()
     if (fly && p.dlat != null) map.flyTo(p.dlon!, p.dlat, Math.max(map.k, 700))
   }
@@ -158,11 +158,12 @@ async function main() {
   // ---------- modes & controls
   function render() { if (mode === 'sim') renderSim(); else renderClusters() }
   // ---------- shareable URL: ?q=Polish&scale=regional&map=lon,lat,zoom | ?view=clusters&open=…
+  const profKey = (s: string) => s.replace(/ Profile$/, '').replace(/ /g, '_')
   const SCALE_NAME: Record<string, string> = { '0.05': 'close', '0.25': 'regional', '1': 'global' }
   let urlTimer = 0, lastState = '', applying = false
   function syncUrl() {
     const u = new URLSearchParams()
-    if (mode === 'sim') { if (query) u.set('q', query.core); if (rangeQ !== 0.25) u.set('scale', SCALE_NAME[String(rangeQ)]) }
+    if (mode === 'sim') { if (query) { u.set('q', query.core); if (query.profile) u.set('p', profKey(query.profile)) } if (rangeQ !== 0.25) u.set('scale', SCALE_NAME[String(rangeQ)]) }
     else { u.set('view', 'clusters'); u.set('open', [...open].filter(n => n !== tree.root).join(',')); if (focus !== tree.root) u.set('focus', String(focus)) }
     const state = u.toString()
     const v = map.view(); u.set('map', `${v.lon.toFixed(2)},${v.lat.toFixed(2)},${Math.round(v.k)}`)
@@ -278,7 +279,11 @@ async function main() {
       const f = u.has('focus') ? Number(u.get('focus')) : -1; focus = tree.nodes[f] ? f : tree.root
       setMode('clu')
     }
-    else { const p = pops.find(p => p.core === (u.get('q') || DEFAULT_QUERY)) ?? pops[0]; selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, first ? 0 : 600) }
+    else {
+      // several rows can share a core (the curator's profiles of one cohort): p= picks one, otherwise the largest clean one
+      const core = u.get('q') || DEFAULT_QUERY, prof = u.get('p'), cands = pops.filter(p => p.core === core)
+      const p = (prof ? cands.find(p => profKey(p.profile) === prof) : undefined) ?? byCore(core) ?? cands[0] ?? pops[0]
+      selectPop(p, false); if (!hasMap) map.flyTo(p.lon ?? 20, p.lat ?? 50, 450, first ? 0 : 600) }
     if (hasMap) map.flyTo(mapParam[0], mapParam[1], mapParam[2], first ? 0 : 600)
     applying = false
   }
