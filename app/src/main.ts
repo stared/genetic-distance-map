@@ -67,8 +67,8 @@ async function main() {
       const best = mem[0]
       const g = document.createElement('div'); g.className = 'grp'
       const all = mem.filter(p => subOf(p)), cap = all.length > 8 ? 6 : all.length   // long groups fold after 6; "+N more" unfolds in place
-      const subs = all.map((p, i) => `<span data-id="${p.id}" title="${esc(p.label)}"${i >= cap ? ' hidden' : ''}>${esc(subOf(p))} <i>${raw[p.id].toFixed(2)}</i></span>`).join('') + (cap < all.length ? `<button class="more">+${all.length - cap} more</button>` : '')
-      g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], span)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${raw[best.id].toFixed(2)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
+      const subs = all.map((p, i) => `<span data-id="${p.id}" title="${esc(p.label)}"${i >= cap ? ' hidden' : ''}>${esc(subOf(p))} <i>${raw[p.id].toFixed(1)}</i></span>`).join('') + (cap < all.length ? `<button class="more">+${all.length - cap} more</button>` : '')
+      g.innerHTML = `<div class="head"><span class="sw ${best.kind}" style="background:${HeatGrid.colorFor(d[best.id], span)}"></span><span class="name">${esc(disp(first))}</span><span class="num">${raw[best.id].toFixed(1)}</span></div>` + (subs ? `<div class="subs">${subs}</div>` : '')
       g.addEventListener('click', e => {
         const el = e.target as HTMLElement
         if (el.classList.contains('more')) { g.querySelectorAll<HTMLElement>('.subs [hidden]').forEach(s => s.hidden = false); el.remove(); return }
@@ -243,7 +243,7 @@ async function main() {
   map.onHover = (p, x, y) => {
     if (!p) { tip.hidden = true; return }
     let extra = ''
-    if (mode === 'sim' && query) extra = `<br>distance ${raw[p.id].toFixed(2)}`
+    if (mode === 'sim' && query) extra = `<br>distance ${raw[p.id].toFixed(1)}`
     if (mode === 'clu' && clu) { const c = clu.assign.get(p.id); if (c !== undefined) extra = '<br>cluster: ' + esc(nameOfNode(clu.roots[c])) }
     tip.innerHTML = `<b>${esc(disp(p.core))}</b><br><span class="sub">${esc(p.place ?? 'no location')}<br>${tags(p).join(', ')}${extra}</span>`
     tip.hidden = false; tip.style.left = x + 14 + 'px'; tip.style.top = y + 14 + 'px'
@@ -269,6 +269,7 @@ async function main() {
     rangeQ = +scaleQ; rangeEl.value = scaleQ
     applying = true
     if (u.get('view') === 'clusters') {
+      $('modes').hidden = false                                     // the Clusters view is unlisted: reachable via /cluster/ or ?view=clusters
       const ids = (u.get('open') ?? '').split(',').filter(Boolean).map(Number).filter(n => tree.nodes[n] && !tree.isLeaf(n))
       if (ids.length) { open.clear(); open.add(tree.root); ids.forEach(n => open.add(n)) } else cutTo(K_DEFAULT)
       const f = u.has('focus') ? Number(u.get('focus')) : -1; focus = tree.nodes[f] ? f : tree.root
