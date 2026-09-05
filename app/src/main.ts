@@ -181,6 +181,7 @@ async function main() {
     if (m === 'clu') { cutTo(K_DEFAULT); focus = tree.root; setMode(m); zoomTo(tree.root) }   // the tab always opens the world in 8 clusters
     else setMode(m)
   })
+  $('query').onclick = () => { if (matchMedia('(max-width: 700px)').matches) document.body.classList.toggle('list-open') }   // phones: the selected row folds the list
   const rangeEl = $<HTMLSelectElement>('range'); rangeEl.onchange = () => { rangeQ = +rangeEl.value; renderSim() }
 
   // search
