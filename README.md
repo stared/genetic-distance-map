@@ -31,3 +31,5 @@ uv run --with pandas --with numpy --with scipy python analysis/build_data.py   #
 Vite + TypeScript, d3-geo Mercator on a 2D canvas, no map library. Distances are computed in the browser from the 25 coordinates. The panel state and map position live in the URL, so any view is shareable and the Back button undoes steps.
 
 Data viz by [Piotr Migdał](https://p.migdal.pl), 2026. Data by Michalis Moriakos; Global25 by David Wesolowski. Corrections welcome as issues.
+
+Code under the [MIT License](LICENSE). The data belongs to its authors, see above.
