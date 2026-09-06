@@ -151,7 +151,8 @@ body.share #app { flex: none; position: relative; }   /* #share is a child of #a
 #share .s-head { grid-area: head; display: flex; align-items: baseline; gap: 20px; padding: 16px 28px 14px; background: var(--bg); border-bottom: 1px solid var(--line); white-space: nowrap; }
 #share .s-title { font-size: 22px; color: var(--muted); }
 #share .s-title b { color: var(--fg); font-weight: 600; }
-#share .s-sub, #share .s-cap, #share .s-notes, #share .s-credit { color: var(--muted); }
+#share .s-cap, #share .s-notes, #share .s-credit { color: var(--muted); }
+#share .s-notes b, #share .s-credit b { color: var(--fg); font-weight: 400; }   /* proper names and the link stand out, as links do in the panel footer */
 #share .s-cap { font-size: 13px; margin-bottom: 5px; }
 #share ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 #share li { display: flex; align-items: center; gap: 9px; }
@@ -163,7 +164,7 @@ body.share #app { flex: none; position: relative; }   /* #share is a child of #a
 #share .lx span:first-child { text-align: right; }
 #share .s-foot { grid-area: foot; display: flex; justify-content: space-between; gap: 48px; align-items: flex-end; padding: 12px 28px 14px; background: var(--bg); border-top: 1px solid var(--line); }
 #share .s-notes, #share .s-credit { font-size: 13px; line-height: 1.5; }
-#share .s-credit { white-space: nowrap; }
+#share .s-credit { white-space: nowrap; text-align: right; }
 
 /* a: map poster. The scale and the closest in a box in a bottom corner of the map */
 .share-a .s-box { grid-area: map; justify-self: end; align-self: end; margin: 24px; width: 400px; padding: 14px 16px; background: rgba(0, 0, 0, .8); border-radius: 8px; display: flex; flex-direction: column; gap: 14px; }

@@ -88,18 +88,18 @@ async function main() {
   }
   // the share layout: name and facts, the colour scale, the closest populations, source and method, credit
   function renderShare(sorted: Pop[], span: number) {
-    const p = query!.p, when = p.kind === 'a' ? ERA[p.era].toLowerCase() + ' sample' : 'present-day'
-    const facts = [esc(p.place ?? 'no location'), when, `n=${p.n}`, p.profile ? esc(p.profile.replace(/ Profile$/, ' profile')) : ''].filter(Boolean).join(', ')
+    const p = query!.p, era = p.kind === 'a' ? ERA[p.era].toLowerCase() : 'present-day'
+    const facts = `the average of ${p.n} ${era} individual${p.n === 1 ? '' : 's'}`   // the title is one sentence: name, then what the row is; the place is geocoded, so it stays off the image
     const seen = new Set<string>(), rows: Pop[] = []
     for (const q of sorted) { if (raw[q.id] === 0 || seen.has(q.first)) continue; seen.add(q.first); rows.push(q); if (rows.length === 6) break }
     map.labels = share === 'b' ? rows.map(q => ({ lon: q.dlon!, lat: q.dlat!, text: disp(q.core), num: raw[q.id].toFixed(1) })) : []   // b: the closest are labelled on the map itself
     map.request()
     const list = rows.map(q => `<li><span class="sw m" style="background:${HeatGrid.colorFor(d[q.id], span)}"></span><span class="name">${esc(disp(q.core))}</span><span class="num">${raw[q.id].toFixed(1)}</span></li>`).join('')
-    $('share').innerHTML = `<div class="s-head"><div class="s-title">Genetic distance to <b>${esc(query!.name)}</b></div><div class="s-sub">${facts}</div></div>` +
+    $('share').innerHTML = `<div class="s-head"><div class="s-title">Genetic distance to <b>${esc(query!.name)}</b>, ${facts}</div></div>` +
       `<div class="s-box"><div class="s-legend"><div class="lx"><span>${dminEl.textContent}</span><div class="ramp" style="background:${$('ramp').style.background}"></div><span>${dmaxV.textContent}+</span></div></div>` +
       `<div class="s-closest"><div class="s-cap">Closest present-day populations</div><ol>${list}</ol></div></div>` +
-      `<div class="s-foot"><div class="s-notes"><div>Data source: Moriopoulos Collection 2025, population averages on Global25, a 25-dimensional PCA of genotypes.</div><div>Distances are Euclidean between those averages, multiplied by 100. Locations are approximate and the interpolation is decorative.</div></div>` +
-      `<div class="s-credit">Data viz by Piotr Migdał, 2026, p.migdal.pl/genetic-distance-map</div></div>`
+      `<div class="s-foot"><div class="s-notes"><div>Data source: <b>Moriopoulos Collection 2025</b>, population averages on <b>Global25</b>, a 25-dimensional PCA of genotypes.</div><div>Distances are Euclidean between those averages, multiplied by 100. Locations are approximate and the interpolation is decorative.</div></div>` +
+      `<div class="s-credit"><div>Data viz by <b>Piotr Migdał</b>, 2026</div><div>Interactive exploration: <b>p.migdal.pl/genetic-distance-map</b></div></div></div>`
     $('share').hidden = false
   }
   function selectPop(p: Pop, fly: boolean) {
