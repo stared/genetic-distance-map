@@ -12,6 +12,7 @@ export class FlatMap {
   k = 100; tx = 0; ty = 0                       // mercator scale and translate (css px)
   proj: GeoProjection = geoMercator()
   state: MapState = { styles: [], rasterAlpha: 0.85 }
+  labels: { lon: number; lat: number; text: string; num: string }[] = []   // direct labels next to their dots (share view)
   onClick: (lon: number, lat: number, pop: Pop | null) => void = () => {}
   onHover: (pop: Pop | null, x: number, y: number) => void = () => {}
   onMove: () => void = () => {}                 // called after every render (pan, zoom, animation frame)
@@ -148,9 +149,29 @@ export class FlatMap {
         this.screen[p.id * 2] = q[0]; this.screen[p.id * 2 + 1] = q[1]
         this.dot(ctx, p, q[0], q[1], s.r, s.color, s.alpha)
       }
+      if (this.labels.length) this.drawLabels(ctx, proj)
     }
     ctx.globalAlpha = 1
     if (this.anim) this.onMove()
+  }
+  /** each label tries right, left, above, below of its dot and takes the first spot free of earlier labels and of other labelled dots;
+      the name is white, the number one step dimmer */
+  private drawLabels(ctx: CanvasRenderingContext2D, proj: (p: [number, number]) => [number, number] | null) {
+    const font = '500 14px Inter, -apple-system, "Segoe UI", system-ui, sans-serif'
+    ctx.font = font; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.lineJoin = 'round'
+    const pts = this.labels.map(l => proj([l.lon, l.lat])!), taken: number[][] = pts.map(q => [q[0] - 6, q[1] - 6, q[0] + 6, q[1] + 6])
+    const free = (r: number[]) => taken.every(t => r[2] < t[0] || r[0] > t[2] || r[3] < t[1] || r[1] > t[3])
+    this.labels.forEach((l, i) => {
+      const [x, y] = pts[i], wn = ctx.measureText(l.text).width, w = wn + 5 + ctx.measureText(l.num).width, h = 16, g = 9
+      const cands: [number, number][] = [[x + g, y], [x - g - w, y], [x - w / 2, y - g - 6], [x - w / 2, y + g + 6]]
+      for (const [x0, cy] of cands) {
+        const r = [x0 - 2, cy - h / 2, x0 + w + 2, cy + h / 2]
+        if (!free(r)) continue
+        taken.push(r)
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(l.text, x0, cy); ctx.strokeText(l.num, x0 + wn + 5, cy)
+        ctx.fillStyle = '#f4f4f5'; ctx.fillText(l.text, x0, cy); ctx.fillStyle = '#a1a1aa'; ctx.fillText(l.num, x0 + wn + 5, cy); break
+      }
+    })
   }
   private dot(ctx: CanvasRenderingContext2D, p: Pop, x: number, y: number, r: number, color: string, alpha: number) {
     ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.beginPath()

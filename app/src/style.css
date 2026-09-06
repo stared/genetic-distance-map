@@ -140,3 +140,37 @@ a { color: var(--accent); text-decoration: none; }
   #tooltip { display: none !important; }
   body.searching #map, body.searching #query, body.searching #nearest { display: none; }
 }
+
+/* share: a still image (?share=a|b&size=WxH&corner=br|bl). A fixed frame; the panel and controls go, the map fills it,
+   one header line above and one source band below. White for names, grey for everything that explains them */
+body.share #panel, body.share #legend, body.share #tooltip { display: none !important; }
+body.share #map canvas { cursor: default; }
+body.share { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #0c0c0e; }
+body.share #app { flex: none; position: relative; }   /* #share is a child of #app, so this is its frame */
+#share { position: absolute; inset: 0; pointer-events: none; font-size: 15px; line-height: 1.4; display: grid; grid-template-rows: auto 1fr auto; grid-template-areas: "head" "map" "foot"; }
+#share .s-head { grid-area: head; display: flex; align-items: baseline; gap: 20px; padding: 16px 28px 14px; background: var(--bg); border-bottom: 1px solid var(--line); white-space: nowrap; }
+#share .s-title { font-size: 22px; color: var(--muted); }
+#share .s-title b { color: var(--fg); font-weight: 600; }
+#share .s-sub, #share .s-cap, #share .s-notes, #share .s-credit { color: var(--muted); }
+#share .s-cap { font-size: 13px; margin-bottom: 5px; }
+#share ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+#share li { display: flex; align-items: center; gap: 9px; }
+#share li .name { flex: 1; white-space: nowrap; }
+#share li .num { font-size: 14px; }
+#share .lx { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 14px; color: var(--muted); }
+#share .lx .ramp { flex: 1; height: 8px; }
+#share .lx span { flex: none; min-width: 28px; }
+#share .lx span:first-child { text-align: right; }
+#share .s-foot { grid-area: foot; display: flex; justify-content: space-between; gap: 48px; align-items: flex-end; padding: 12px 28px 14px; background: var(--bg); border-top: 1px solid var(--line); }
+#share .s-notes, #share .s-credit { font-size: 13px; line-height: 1.5; }
+#share .s-credit { white-space: nowrap; }
+
+/* a: map poster. The scale and the closest in a box in a bottom corner of the map */
+.share-a .s-box { grid-area: map; justify-self: end; align-self: end; margin: 24px; width: 400px; padding: 14px 16px; background: rgba(0, 0, 0, .8); border-radius: 8px; display: flex; flex-direction: column; gap: 14px; }
+.share-a.corner-bl .s-box { justify-self: start; }
+
+/* b: press chart. The scale at the right of the header line, the closest labelled on the map */
+.share-b .s-box { display: contents; }
+.share-b .s-legend { grid-area: head; justify-self: end; align-self: center; width: 320px; margin-right: 28px; }
+.share-b .s-head { padding-right: 400px; }
+.share-b .s-closest { display: none; }
