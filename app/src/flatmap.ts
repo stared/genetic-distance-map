@@ -12,7 +12,7 @@ export class FlatMap {
   k = 100; tx = 0; ty = 0                       // mercator scale and translate (css px)
   proj: GeoProjection = geoMercator()
   state: MapState = { styles: [], rasterAlpha: 0.85 }
-  labels: { lon: number; lat: number; text: string; num: string }[] = []   // direct labels next to their dots (share view)
+  labels: { lon: number; lat: number; text: string; num: string; side?: string }[] = []   // direct labels next to their dots (share view)
   onClick: (lon: number, lat: number, pop: Pop | null) => void = () => {}
   onHover: (pop: Pop | null, x: number, y: number) => void = () => {}
   onMove: () => void = () => {}                 // called after every render (pan, zoom, animation frame)
@@ -22,7 +22,7 @@ export class FlatMap {
   private dragging = false; private moved = false; private raf = 0; private last: [number, number] = [0, 0]
   private anim: { t0: number; dur: number; from: [number, number, number]; to: [number, number, number] } | null = null
 
-  constructor(container: HTMLElement, pops: Pop[], land: any, borders: any, heat: HeatGrid) {
+  constructor(container: HTMLElement, pops: Pop[], land: any, borders: any, heat: HeatGrid, private fixedDpr?: number) {
     this.pops = pops; this.land = land; this.borders = borders; this.heat = heat
     this.canvas = document.createElement('canvas'); container.appendChild(this.canvas)
     this.ctx = this.canvas.getContext('2d')!
@@ -68,7 +68,7 @@ export class FlatMap {
   resize() {
     const box = this.canvas.parentElement!.getBoundingClientRect()
     if (box.width < 2 || box.height < 2) return                        // hidden (display: none): keep the view for when it comes back
-    this.w = Math.max(1, Math.floor(box.width)); this.h = Math.max(1, Math.floor(box.height)); this.dpr = window.devicePixelRatio || 1
+    this.w = Math.max(1, Math.floor(box.width)); this.h = Math.max(1, Math.floor(box.height)); this.dpr = this.fixedDpr ?? (window.devicePixelRatio || 1)
     this.canvas.width = this.w * this.dpr; this.canvas.height = this.h * this.dpr; this.canvas.style.width = this.w + 'px'; this.canvas.style.height = this.h + 'px'
     this.clamp(); this.request()
   }
@@ -162,11 +162,12 @@ export class FlatMap {
     const pts = this.labels.map(l => proj([l.lon, l.lat])!), taken: number[][] = pts.map(q => [q[0] - 6, q[1] - 6, q[0] + 6, q[1] + 6])
     const free = (r: number[]) => taken.every(t => r[2] < t[0] || r[0] > t[2] || r[3] < t[1] || r[1] > t[3])
     this.labels.forEach((l, i) => {
-      const [x, y] = pts[i], wn = ctx.measureText(l.text).width, w = wn + 5 + ctx.measureText(l.num).width, h = 16, g = 9
-      const cands: [number, number][] = [[x + g, y], [x - g - w, y], [x - w / 2, y - g - 6], [x - w / 2, y + g + 6]]
+      const [x, y] = pts[i], wn = ctx.measureText(l.text).width, w = wn + (l.num ? 5 + ctx.measureText(l.num).width : 0), h = 16, g = 9
+      const all: Record<string, [number, number]> = { r: [x + g, y], l: [x - g - w, y], t: [x - w / 2, y - g - 6], b: [x - w / 2, y + g + 6] }
+      const cands = l.side && all[l.side] ? [all[l.side]] : [all.r, all.l, all.t, all.b]   // a hinted side is taken as is
       for (const [x0, cy] of cands) {
         const r = [x0 - 2, cy - h / 2, x0 + w + 2, cy + h / 2]
-        if (!free(r)) continue
+        if (cands.length > 1 && !free(r)) continue
         taken.push(r)
         ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.strokeText(l.text, x0, cy); ctx.strokeText(l.num, x0 + wn + 5, cy)
         ctx.fillStyle = '#f4f4f5'; ctx.fillText(l.text, x0, cy); ctx.fillStyle = '#a1a1aa'; ctx.fillText(l.num, x0 + wn + 5, cy); break

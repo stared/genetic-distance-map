@@ -6,6 +6,7 @@ import { loadWorld } from './world'
 import { FlatMap, type PointStyle } from './flatmap'
 import { renderTree } from './treeview'
 import { regionOf } from './regions'
+import { makePoster, download, TOP, BOT } from './poster'
 
 type Mode = 'sim' | 'clu'
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
@@ -24,6 +25,8 @@ async function main() {
   const byId = new Map(pops.map(p => [p.id, p]))
   const tree = new Tree(treesRaw.m)   // the map always shows present-day populations; ancient samples are queries only
   const heat = new HeatGrid(pops, world.landGeo)
+  const share = new URLSearchParams(location.search).has('share')          // ?share: the poster page, the still image of the query with a download button
+  if (share) document.body.classList.add('share')
   const map = new FlatMap($('map'), pops, world.landGeo, world.borders, heat)
   ;(window as any).__dbg = { map, pops, heat, tree, world }
   const R_M = 3.2, R_A = 2.6
@@ -44,12 +47,6 @@ async function main() {
 
   // ---------- similarity
   let query: { name: string; core: string; profile: string; meta: string; c: number[]; p: Pop } | null = null
-  const share = new URLSearchParams(location.search).get('share')          // ?share=a|b: a still image layout for downloading and sharing
-  if (share) {
-    document.body.classList.add('share', 'share-' + share, 'corner-' + (new URLSearchParams(location.search).get('corner') ?? 'br'))   // corner=bl|br: where the legend box sits in layout a
-    const [w, h] = (new URLSearchParams(location.search).get('size') ?? '1600x1000').split('x').map(Number)   // the image is a fixed frame, whatever the window
-    $('app').style.width = w + 'px'; $('app').style.height = h + 'px'
-  }
   const d = new Float32Array(pops.length), raw = new Float32Array(pops.length)
   let d0 = 0                                   // colour scale runs from d0 (nearest shown population) to dmax
   const dminEl = $('dmin'), dmaxV = $('dmaxv'), legend = $('legend')
@@ -83,24 +80,29 @@ async function main() {
         const t = el.closest('[data-id]') as HTMLElement | null; selectPop(byId.get(t ? +t.dataset.id! : best.id)!, true) })
       list.appendChild(g)
     }
-    if (share) renderShare(sorted, span)
+    if (share) showPoster()
     syncUrl()
   }
-  // the share layout: name and facts, the colour scale, the closest populations, source and method, credit
-  function renderShare(sorted: Pop[], span: number) {
-    const p = query!.p, era = p.kind === 'a' ? ERA[p.era].toLowerCase() : 'present-day'
-    const facts = `the average of ${p.n} ${era} individual${p.n === 1 ? '' : 's'}`   // the title is one sentence: name, then what the row is; the place is geocoded, so it stays off the image
-    const seen = new Set<string>(), rows: Pop[] = []
-    for (const q of sorted) { if (raw[q.id] === 0 || seen.has(q.first)) continue; seen.add(q.first); rows.push(q); if (rows.length === 6) break }
-    map.labels = share === 'b' ? rows.map(q => ({ lon: q.dlon!, lat: q.dlat!, text: disp(q.core), num: raw[q.id].toFixed(1) })) : []   // b: the closest are labelled on the map itself
-    map.request()
-    const list = rows.map(q => `<li><span class="sw m" style="background:${HeatGrid.colorFor(d[q.id], span)}"></span><span class="name">${esc(disp(q.core))}</span><span class="num">${raw[q.id].toFixed(1)}</span></li>`).join('')
-    $('share').innerHTML = `<div class="s-head"><div class="s-title">Genetic distance to <b>${esc(query!.name)}</b>, ${facts}</div></div>` +
-      `<div class="s-box"><div class="s-legend"><div class="lx"><span>${dminEl.textContent}</span><div class="ramp" style="background:${$('ramp').style.background}"></div><span>${dmaxV.textContent}+</span></div></div>` +
-      `<div class="s-closest"><div class="s-cap">Closest present-day populations</div><ol>${list}</ol></div></div>` +
-      `<div class="s-foot"><div class="s-notes"><div>Data source: <b>Moriopoulos Collection 2025</b>, population averages on <b>Global25</b>, a 25-dimensional PCA of genotypes.</div><div>Distances are Euclidean between those averages, multiplied by 100. Locations are approximate and the interpolation is decorative.</div></div>` +
-      `<div class="s-credit"><div>Data viz by <b>Piotr Migdał</b>, 2026</div><div>Interactive exploration: <b>p.migdal.pl/genetic-distance-map</b></div></div></div>`
-    $('share').hidden = false
+  // ---------- the poster: a 1600×1000 still of the query for downloading and sharing
+  const eraOf = (p: Pop) => p.kind === 'a' ? ERA[p.era].toLowerCase() : 'present-day'
+  function poster(view: { lon: number; lat: number; k: number }, labels?: { q: Pop; side: string }[]) {
+    const [w, h] = (new URLSearchParams(location.search).get('size') ?? '1600x1000').split('x').map(Number)
+    return makePoster({ pops, land: world.landGeo, borders: world.borders, heat, state: map.state, p: query!.p, raw, visible, era: eraOf(query!.p),
+      dmin: dminEl.textContent!, dmax: dmaxV.textContent!, view, labels, w, h })
+  }
+  const posterName = () => `genetic-distance-${query!.core.replace(/[^\w-]+/g, '_')}.png`
+  // the download button: the view as seen, fitted into the poster frame so nothing on screen is lost
+  $('dl').onclick = () => { if (!query) return; const v = map.view(); download(poster({ lon: v.lon, lat: v.lat, k: v.k * Math.min(1600 / map.w, (1000 - TOP - BOT) / map.h) }), posterName()) }
+  // ?share&q=…&map=lon,lat,k[&labels=core[:l|r|t|b],…][&size=WxH]: the poster page. The frame comes from map=, the labels are
+  // picked automatically unless listed; a listed core means its largest row, a side hint places its label left, right, above or below
+  function showPoster() {
+    const u = new URLSearchParams(location.search), mp = (u.get('map') ?? '').split(',').map(Number)
+    const view = mp.length === 3 && mp.every(Number.isFinite) ? { lon: mp[0], lat: mp[1], k: mp[2] } : { lon: query!.p.dlon ?? 20, lat: query!.p.dlat ?? 45, k: 1300 }
+    const picked = (u.get('labels') ?? '').split(',').filter(Boolean).map(c => { const [core, side] = c.split(':'); return { q: pops.filter(q => q.core === core && visible[q.id]).sort(byN)[0], side } }).filter((x): x is { q: Pop; side: string } => !!x.q)
+    const c = poster(view, picked)
+    const el = $('poster'); el.innerHTML = ''; el.hidden = false
+    c.style.width = c.width / 2 + 'px'; c.style.height = c.height / 2 + 'px'; el.appendChild(c)
+    const b = document.createElement('button'); b.textContent = 'Download PNG'; b.onclick = () => download(c, posterName()); el.appendChild(b)
   }
   function selectPop(p: Pop, fly: boolean) {
     query = { name: disp(p.core), core: p.core, profile: p.profile, meta: meta(p), c: p.c, p }

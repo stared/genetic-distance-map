@@ -1,0 +1,41 @@
+// Display names for the share view. The dataset's labels are curator keys ("Italian_Campania_Naples_(Campanian)");
+// on a chart a reader wants a people. Place-first English: a demonym where one is common (Neapolitans, Cretans),
+// otherwise "Place People" (Kayseri Turks, German Ashkenazim). No punctuation inside a name.
+export const NAMES: Record<string, string> = {
+  Alawite_Turkey: 'Hatay Alawites', Albanian_Tosk: 'Tosk Albanians', Algerian_Jew: 'Algerian Jews', Armenian_Ararat: 'Ararat Armenians',
+  Ashkenazi_Jew: 'Ashkenazi Jews', Ashkenazi_Jew_Austria: 'Austrian Ashkenazim', Ashkenazi_Jew_Belarus: 'Belarusian Ashkenazim',
+  Ashkenazi_Jew_France: 'French Ashkenazim', Ashkenazi_Jew_Germany: 'German Ashkenazim', Ashkenazi_Jew_Lithuania: 'Lithuanian Ashkenazim',
+  Ashkenazi_Jew_Poland: 'Polish Ashkenazim', Ashkenazi_Jew_Romania: 'Romanian Ashkenazim', Ashkenazi_Jew_Russia: 'Russian Ashkenazim',
+  Ashkenazi_Jew_Ukraine: 'Ukrainian Ashkenazim',
+  Assyrian_Iraq: 'Iraqi Assyrians', Assyrian_Syriac_Orthodox_Turkey_Tur_Abdin: 'Tur Abdin Assyrians',
+  Azeri_Azerbaijan_Gabala: 'Gabala Azeris', Azeri_Iran_Tehran: 'Tehran Azeris', Bashkir_Miyakinsky: 'Miyakinsky Bashkirs', Besermyan: 'Besermyans',
+  Breton_Finistere: 'Finistère Bretons', Chechen: 'Chechens', Chuvash: 'Chuvash', Cypriot_Arab_Maronite: 'Cypriot Maronites', Danish: 'Danes',
+  Druze_Israel: 'Israeli Druze', Druze_Lebanon: 'Lebanese Druze', Dutch: 'Dutch', Egyptian_Copt: 'Copts', English: 'English',
+  Finnish: 'Finns', Finnish_East: 'East Finns', 'French_Oil_Normandy_Seine-Maritime': 'Normans', Georgian_Imeretian: 'Imeretians',
+  German_Hamburg: 'Hamburg Germans', Greek_Crete_Heraklion: 'Cretans', Greek_Cyprus: 'Greek Cypriots', Greek_Dodecanese_Kos: 'Kos Greeks',
+  Greek_Dodecanese_Rhodes: 'Rhodes Greeks', Greek_Lycaonia_Ikonio: 'Konya Greeks', Greek_Peloponnese_Laconia_Deep_Mani: 'Maniots',
+  Greek_Western_Anatolia_Smyrna: 'Smyrna Greeks', Icelandic: 'Icelanders', Iraqi_Arab: 'Iraqi Arabs', Iraqi_Jew: 'Iraqi Jews', Irish: 'Irish',
+  Israel_LBA_Megiddo: 'Bronze Age Megiddo',
+  'Italian_Abruzzo_(Abruzzese)': 'Abruzzese', 'Italian_Apulia_(Apulian)': 'Apulians', 'Italian_Calabria_(Cosentian)': 'Cosentians',
+  'Italian_Campania_(Campanian)': 'Campanians', 'Italian_Campania_Naples_(Campanian)': 'Neapolitans', 'Italian_Lazio_(Lazian)': 'Lazio Italians',
+  'Italian_Tuscany_(Tuscan)': 'Tuscans', Italy_Lazio_Roman_Empire_Rome: 'Imperial Rome burials',
+  Jordanian_Arab_Muslim: 'Jordanian Muslims', Karaite_Jew_Egypt: 'Cairo Karaites', Komi: 'Komi', Komi_Zyrian_Siberia: 'Siberian Komi',
+  Kurdish: 'Kurds', Kurdish_Iran_Kermanshah: 'Kermanshah Kurds', Kurdish_Jew: 'Kurdish Jews', Kurdish_Kurmanji_Turkey: 'Diyarbakır Kurds', Kurdish_Kurmanji_Turkey_Konya: 'Konya Kurds',
+  Kurdish_Sorani_Iraq_Sulaymaniyah: 'Sulaymaniyah Kurds', Lebanese_Arab_Christian_Maronite_Zgharta: 'Zgharta Maronites', Lur: 'Lurs', Maltese: 'Maltese',
+  Mordvin: 'Mordvins', Moroccan_Jew: 'Moroccan Jews', Norwegian: 'Norwegians', Orcadian: 'Orcadians', Palestinian_Arab_Christian: 'Palestinian Christians',
+  Palestinian_Arab_Muslim: 'Palestinian Muslims', Parsi_Pakistan: 'Karachi Parsis', Persian_Tehran: 'Tehran Persians', Persian_Fars: 'Fars Persians', Polish: 'Poles',
+  'Roma_Bosnia-Herzegovina': 'Bosnian Roma', Roma_Czechia: 'Czech Roma', Roma_Portugal_Porto: 'Porto Roma', Roma_Serbia: 'Serbian Roma',
+  Roma_Spain_Bilbao: 'Bilbao Roma', Roma_Spain_Granada: 'Granada Roma', Roma_Turkey_Balkans: 'Thracian Roma', 'Romaniote_(Yevanic_Jew)': 'Romaniote Jews',
+  Russian_Arkhangelsk_Leshukonsky: 'Leshukonsky Russians', Russian_Arkhangelsk_Pinezhsky: 'Pinega Russians', Russian_Yaroslavl: 'Yaroslavl Russians',
+  Samaritan: 'Samaritans', Saudi_Arab: 'Saudi Arabs', Scottish: 'Scots', Sephardic_Jew_Bulgaria: 'Bulgarian Sephardim',
+  'Sephardic_Jew_Portugal_(Belmonte_Crypto-Jew)': 'Belmonte Jews', Sephardic_Jew_Turkey: 'Turkish Sephardim', Shetlandic: 'Shetlanders',
+  Sicilian_Trapani: 'Trapani Sicilians', Sicilian_West: 'West Sicilians', 'Sweden_Early-High_Medieval_Viking_Age_Skara': 'Skara Viking-age burials',
+  Swedish: 'Swedes', Syrian_Arab: 'Syrian Arabs', Syrian_Arab_Aleppo: 'Aleppo Arabs', Syrian_Jew: 'Syrian Jews', Talysh_Azerbaijan: 'Talysh',
+  Tat_Dagestan_Nyugdi: 'Dagestani Tats', Tatar: 'Kazan Tatars', Tatar_Lipka: 'Lipka Tatars', Tatar_Mishar: 'Mishar Tatars', Tunisian_Jew: 'Tunisian Jews',
+  Turkish_Kayseri: 'Kayseri Turks', Udmurt: 'Udmurts', Vepsian: 'Vepsians', Yaghnobi: 'Yaghnobis', Yazidi_Armenia: 'Armenian Yazidis', Zoroastrian_Iran: 'Yazd Zoroastrians',
+}
+// the title is a sentence; ancient samples read as burials of a place and time
+export const TITLES: Record<string, string> = {
+  Italy_Lazio_Roman_Empire_Rome: 'Imperial Rome burials', 'Sweden_Early-High_Medieval_Viking_Age_Skara': 'Viking-age burials at Skara, Sweden',
+  Israel_LBA_Megiddo: 'Canaanites of Bronze Age Megiddo',
+}

@@ -49,11 +49,12 @@
     <div id="legend" hidden>
       <div class="lt">Genetic distance<span class="to"> to <b id="lname"></b></span>,<span class="sc"> on <select id="range"><option value="0.05">close</option><option value="0.25" selected>regional</option><option value="1">global</option></select> scale</span></div>
       <div class="lx"><span id="dmin">0</span><div class="ramp" id="ramp"></div><span id="dmaxv">20</span></div>
+      <button id="dl" class="dl" title="Save this view as a 1600×1000 image with the closest populations labelled">Download image</button>
     </div>
+    <div id="tooltip" hidden></div>
   </div>
-  <div id="share" hidden></div>
-  <div id="tooltip" hidden></div>
 </div>
+<div id="poster" hidden></div>
 <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
