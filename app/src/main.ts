@@ -53,12 +53,12 @@ async function main() {
   let rangeQ = 0.25                            // upper end of the colour scale: this quantile of distances to the query
   $('ramp').style.background = `linear-gradient(to right, ${[0, .1, .2, .35, .5, .7, 1].map(t => ramp(Math.sqrt(t))).join(',')})`
   function renderSim() {
-    if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; legend.hidden = true; return }
+    if (!query) { heat.clear(); map.setRaster(0); setPoints(p => visible[p.id] ? '#a1a1aa' : null, () => 1); $('nearest').innerHTML = ''; $('query').innerHTML = ''; legend.hidden = $('dl').hidden = true; return }
     for (const p of pops) raw[p.id] = 100 * dist(query.c, p.c)
     const sorted = pops.filter(p => visible[p.id]).sort((a, b) => raw[a.id] - raw[b.id])
     d0 = raw[sorted[0].id]                    // the nearest shown population is always the red end
     const dmax = Math.max(d0 + 3, Math.round(raw[sorted[Math.floor(rangeQ * (sorted.length - 1))].id])), span = dmax - d0
-    dminEl.textContent = Number.isInteger(d0) ? String(d0) : d0.toFixed(1); dmaxV.textContent = String(dmax); $('lname').textContent = query.name; legend.hidden = false
+    dminEl.textContent = Number.isInteger(d0) ? String(d0) : d0.toFixed(1); dmaxV.textContent = String(dmax); $('lname').textContent = query.name; legend.hidden = $('dl').hidden = false
     for (const p of pops) d[p.id] = Math.max(0, raw[p.id] - d0)
     heat.renderHeat(field, d, visible, span); map.setRaster(0.7)
     setPoints(p => visible[p.id] ? HeatGrid.colorFor(d[p.id], span) : null, () => 1)
@@ -199,7 +199,7 @@ async function main() {
   }
   map.onMove = () => { clearTimeout(urlTimer); urlTimer = window.setTimeout(syncUrl, 250) }
   function setMode(m: Mode) {
-    mode = m; legend.hidden = m !== 'sim' || !query
+    mode = m; legend.hidden = $('dl').hidden = m !== 'sim' || !query
     document.querySelectorAll<HTMLButtonElement>('#modes button').forEach(b => b.classList.toggle('active', b.dataset.mode === m))
     document.querySelectorAll<HTMLElement>('.mode').forEach(s => s.hidden = s.id !== 'mode-' + m)
     render()
