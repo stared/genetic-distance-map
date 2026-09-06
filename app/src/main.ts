@@ -260,8 +260,8 @@ async function main() {
     const atWord = (p: Pop) => { const s = searchText.get(p.id)!, i = s.indexOf(words[0]); return i === 0 || s[i - 1] === '_' ? 0 : 1 }
     const rank = (a: Pop, b: Pop) => atWord(a) - atWord(b) || b.n - a.n
     const hits = pops.filter(p => { const s = searchText.get(p.id)!; return words.every(w => s.includes(w)) }).sort(rank)
-    const g: Groups = { m: uniq(hits.filter(p => p.kind === 'm')).slice(0, 20).map(rowOf) }
-    for (const e of ERAS) g[e] = uniq(hits.filter(p => p.kind === 'a' && p.era === e)).slice(0, 12).map(rowOf)
+    const g: Groups = { m: uniq(hits.filter(p => p.kind === 'm')).map(rowOf) }
+    for (const e of ERAS) g[e] = uniq(hits.filter(p => p.kind === 'a' && p.era === e)).map(rowOf)
     showSuggest(g)
   }
   search.onblur = () => setTimeout(() => searching(false), 150)
