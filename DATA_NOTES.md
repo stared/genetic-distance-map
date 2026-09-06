@@ -6,7 +6,7 @@ Running log of data sources, formats, conventions, and known quirks. Keep this u
 
 ### Moriopoulos Collection 2025 (primary dataset)
 
-- **Author:** Michalis Moriakos ("Moriopoulos"), hobbyist curator. Not affiliated with any company; explicitly non-commercial, "for educational purposes".
+- **Author:** Michalis Moriopoulos (as he signs on GenArchivist and in Eurogenes comments), hobbyist curator. Not affiliated with any company; explicitly non-commercial, "for educational purposes".
 - **Announcement:** https://genarchivist.net/showthread.php?tid=1449 (posted 2025-02-14). Yearly release; 2024 edition had ~5,000 averages from ~30,000 individuals; 2026 edition is planned (target 50,000 individuals).
 - **What it is:** population *averages* of Global25 (G25) coordinates, curated from public and privately contributed individual coordinates. Individual coordinates are **not** published (many are private samples). The curator's main added value is sorting heterogeneous cohorts (Imperial Rome, Vikings, Avars, etc.) into named "profiles" instead of leaving them as anonymous outliers.
 - **Six spreadsheets** are distributed: All / Ancients / Moderns, each in a "With Sims" and a "No Sims" variant. "Sims" are simulated coordinates used as stopgaps for underrepresented groups.
@@ -75,7 +75,7 @@ Co-located rows are jittered by up to ~0.1–0.3° for display only (`dlat`/`dlo
 
 No maintained "G25 label → lat/lon" table exists publicly. Building blocks:
 - **AADR `.anno` file** (Reich Lab, Allen Ancient DNA Resource): per-sample lat/lon, locality, political entity, date, coverage. https://dataverse.harvard.edu/dataverse/reich_lab, paper https://www.nature.com/articles/s41597-024-03031-7. G25 ancient labels are AADR-derived but are not AADR IDs, so joining needs fuzzy label parsing (country + period + site).
-- **Ajeje Brazorf's G25 Ancients sheets** (dated/undated, with date and coverage per individual), linked from https://sites.google.com/view/gm3302/treesmapsdata/data-global-25. Recommended by Moriakos himself.
+- **Ajeje Brazorf's G25 Ancients sheets** (dated/undated, with date and coverage per individual), linked from https://sites.google.com/view/gm3302/treesmapsdata/data-global-25. Recommended by Moriopoulos himself.
 - **HubG25** (https://hubg25.github.io/HubG25/): aggregator with one-click datasets (official G25, Moriopoulos 2026, Akbari et al. 2026) and AADR v66 / Akbari 2026 explorers whose schemas include lat/lon. Its mapper requires manual pin placement, so it ships no label→coordinate table.
 - **MyGeneticMaps** (https://mygeneticmaps.com/): renders Moriopoulos-based distances as heatmaps over ~3,800 admin subdivisions (polygons, not points). Closest existing thing to the planned map; worth looking at for UX, not for data.
 
